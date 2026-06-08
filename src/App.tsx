@@ -130,28 +130,49 @@ const examples = [
   '咳嗽两周不好，要挂什么科？',
 ]
 
+function useSessionState<T>(key: string, initialValue: T): [T, React.Dispatch<React.SetStateAction<T>>] {
+  const [state, setState] = React.useState<T>(() => {
+    try {
+      const stored = sessionStorage.getItem(key)
+      return stored ? JSON.parse(stored) : initialValue
+    } catch {
+      return initialValue
+    }
+  })
+
+  React.useEffect(() => {
+    try {
+      sessionStorage.setItem(key, JSON.stringify(state))
+    } catch {
+      // ignore
+    }
+  }, [key, state])
+
+  return [state, setState]
+}
+
 function App() {
-  const [view, setView] = React.useState<View>('home')
+  const [view, setView] = useSessionState<View>('carecue_view', 'home')
   const [user, setUser] = React.useState<User | null>(null)
   const [authStatus, setAuthStatus] = React.useState<AuthStatus>('checking')
   const [authMode, setAuthMode] = React.useState<'login' | 'register'>('login')
   const [account, setAccount] = React.useState('')
   const [password, setPassword] = React.useState('')
   const [displayName, setDisplayName] = React.useState('')
-  const [chiefComplaint, setChiefComplaint] = React.useState('')
-  const [scenario, setScenario] = React.useState('')
-  const [scenarioName, setScenarioName] = React.useState('')
-  const [questions, setQuestions] = React.useState<Question[]>([])
-  const [currentQuestionIndex, setCurrentQuestionIndex] = React.useState(0)
-  const [answers, setAnswers] = React.useState<Answer[]>([])
-  const [selectedValues, setSelectedValues] = React.useState<string[]>([])
-  const [textAnswer, setTextAnswer] = React.useState('')
-  const [extraText, setExtraText] = React.useState('')
-  const [result, setResult] = React.useState<Result | null>(null)
-  const [activeRecord, setActiveRecord] = React.useState<ConsultationRecord | null>(null)
+  const [chiefComplaint, setChiefComplaint] = useSessionState('carecue_chiefComplaint', '')
+  const [scenario, setScenario] = useSessionState('carecue_scenario', '')
+  const [scenarioName, setScenarioName] = useSessionState('carecue_scenarioName', '')
+  const [questions, setQuestions] = useSessionState<Question[]>('carecue_questions', [])
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useSessionState('carecue_currentQuestionIndex', 0)
+  const [answers, setAnswers] = useSessionState<Answer[]>('carecue_answers', [])
+  const [selectedValues, setSelectedValues] = useSessionState<string[]>('carecue_selectedValues', [])
+  const [textAnswer, setTextAnswer] = useSessionState('carecue_textAnswer', '')
+  const [extraText, setExtraText] = useSessionState('carecue_extraText', '')
+  const [result, setResult] = useSessionState<Result | null>('carecue_result', null)
+  const [activeRecord, setActiveRecord] = useSessionState<ConsultationRecord | null>('carecue_activeRecord', null)
   const [records, setRecords] = React.useState<ConsultationRecord[]>([])
-  const [chatMessages, setChatMessages] = React.useState<ChatMessage[]>([])
-  const [chatInput, setChatInput] = React.useState('')
+  const [chatMessages, setChatMessages] = useSessionState<ChatMessage[]>('carecue_chatMessages', [])
+  const [chatInput, setChatInput] = useSessionState('carecue_chatInput', '')
   const [message, setMessage] = React.useState('')
   const [copyLabel, setCopyLabel] = React.useState('复制摘要')
   const [isChatting, setIsChatting] = React.useState(false)
