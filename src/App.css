@@ -547,7 +547,7 @@ textarea {
   grid-template-columns: minmax(0, 1fr) 340px;
   gap: 24px;
   padding: clamp(20px, 4vw, 40px) clamp(18px, 6vw, 88px);
-  min-height: calc(100svh - 72px);
+  min-height: 100svh;
   background: var(--page);
   max-width: 1400px;
   margin: 0 auto;

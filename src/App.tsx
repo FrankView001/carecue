@@ -3,6 +3,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   ArrowRight,
+  Bot,
   CheckCircle2,
   ClipboardList,
   Clock,
@@ -369,44 +370,46 @@ function App() {
 
   return (
     <main className="app-shell">
-      <header className="topbar">
-        <button className="brand-button" onClick={() => setView('home')} type="button">
-          <span className="brand-mark">
-            <HeartPulse size={22} />
-          </span>
-          <span>
-            <strong>问康</strong>
-            <small>CareCue</small>
-          </span>
-        </button>
+      {view !== 'aiChat' ? (
+        <header className="topbar">
+          <button className="brand-button" onClick={() => setView('home')} type="button">
+            <span className="brand-mark">
+              <HeartPulse size={22} />
+            </span>
+            <span>
+              <strong>问康</strong>
+              <small>CareCue</small>
+            </span>
+          </button>
 
-        <nav className="nav-actions" aria-label="主导航">
-          {authStatus === 'checking' ? (
-            <button className="primary-button small" disabled type="button">
-              恢复登录中
-            </button>
-          ) : user ? (
-            <>
-              <button className="ghost-button" onClick={() => setView('consult')} type="button">
-                <Stethoscope size={18} />
-                新咨询
+          <nav className="nav-actions" aria-label="主导航">
+            {authStatus === 'checking' ? (
+              <button className="primary-button small" disabled type="button">
+                恢复登录中
               </button>
-              <button className="ghost-button" onClick={loadHistory} type="button">
-                <History size={18} />
-                历史
+            ) : user ? (
+              <>
+                <button className="ghost-button" onClick={() => setView('consult')} type="button">
+                  <Stethoscope size={18} />
+                  新咨询
+                </button>
+                <button className="ghost-button" onClick={loadHistory} type="button">
+                  <History size={18} />
+                  历史
+                </button>
+                <button className="icon-button" onClick={logout} title="退出登录" type="button">
+                  <LogOut size={19} />
+                </button>
+              </>
+            ) : (
+              <button className="primary-button small" onClick={startExperience} type="button">
+                立即体验
+                <ArrowRight size={18} />
               </button>
-              <button className="icon-button" onClick={logout} title="退出登录" type="button">
-                <LogOut size={19} />
-              </button>
-            </>
-          ) : (
-            <button className="primary-button small" onClick={startExperience} type="button">
-              立即体验
-              <ArrowRight size={18} />
-            </button>
-          )}
-        </nav>
-      </header>
+            )}
+          </nav>
+        </header>
+      ) : null}
 
       {message ? <div className="toast">{message}</div> : null}
 
@@ -832,7 +835,7 @@ function ChatView({
           </div>
 
           <div className="chat-card ai-welcome-card">
-            <div className="card-icon ai-icon">问康<br/>AI</div>
+            <div className="card-icon ai-icon"><Bot size={28} /></div>
             <div className="card-content">
               <h3>问康 AI</h3>
               <p>我已经接收到你的基础信息，接下来可以继续补充症状变化、诱因、既往病史或用药情况；如果信息已经完整，可以直接生成分析报告。</p>
@@ -843,7 +846,7 @@ function ChatView({
           {chatMessages.slice(1).map((item, index) => (
             <div className={`chat-card message-card ${item.role}`} key={index}>
               <div className={`card-icon ${item.role === 'assistant' ? 'ai-icon' : ''}`}>
-                {item.role === 'assistant' ? <>问康<br/>AI</> : <User size={28} />}
+                {item.role === 'assistant' ? <Bot size={28} /> : <User size={28} />}
               </div>
               <div className="card-content">
                 <h3>{item.role === 'assistant' ? '问康 AI' : '补充诉求'}</h3>
@@ -863,7 +866,7 @@ function ChatView({
 
           {isChatting ? (
             <div className="chat-card message-card assistant">
-               <div className="card-icon ai-icon">问康<br/>AI</div>
+               <div className="card-icon ai-icon"><Bot size={28} /></div>
                <div className="card-content">
                  <h3>问康 AI</h3>
                  <p>正在整理并核查你补充的信息...</p>
