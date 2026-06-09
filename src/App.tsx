@@ -130,49 +130,30 @@ const examples = [
   '咳嗽两周不好，要挂什么科？',
 ]
 
-function useSessionState<T>(key: string, initialValue: T): [T, React.Dispatch<React.SetStateAction<T>>] {
-  const [state, setState] = React.useState<T>(() => {
-    try {
-      const stored = sessionStorage.getItem(key)
-      return stored ? JSON.parse(stored) : initialValue
-    } catch {
-      return initialValue
-    }
-  })
-
-  React.useEffect(() => {
-    try {
-      sessionStorage.setItem(key, JSON.stringify(state))
-    } catch {
-      // ignore
-    }
-  }, [key, state])
-
-  return [state, setState]
-}
-
 function App() {
-  const [view, setView] = useSessionState<View>('carecue_view', 'home')
+  const [view, setView] = React.useState<View>('home')
   const [user, setUser] = React.useState<User | null>(null)
   const [authStatus, setAuthStatus] = React.useState<AuthStatus>('checking')
   const [authMode, setAuthMode] = React.useState<'login' | 'register'>('login')
   const [account, setAccount] = React.useState('')
   const [password, setPassword] = React.useState('')
   const [displayName, setDisplayName] = React.useState('')
-  const [chiefComplaint, setChiefComplaint] = useSessionState('carecue_chiefComplaint', '')
-  const [scenario, setScenario] = useSessionState('carecue_scenario', '')
-  const [scenarioName, setScenarioName] = useSessionState('carecue_scenarioName', '')
-  const [questions, setQuestions] = useSessionState<Question[]>('carecue_questions', [])
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useSessionState('carecue_currentQuestionIndex', 0)
-  const [answers, setAnswers] = useSessionState<Answer[]>('carecue_answers', [])
-  const [selectedValues, setSelectedValues] = useSessionState<string[]>('carecue_selectedValues', [])
-  const [textAnswer, setTextAnswer] = useSessionState('carecue_textAnswer', '')
-  const [extraText, setExtraText] = useSessionState('carecue_extraText', '')
-  const [result, setResult] = useSessionState<Result | null>('carecue_result', null)
-  const [activeRecord, setActiveRecord] = useSessionState<ConsultationRecord | null>('carecue_activeRecord', null)
+  const [chiefComplaint, setChiefComplaint] = React.useState('')
+  const urgentKeywords = ['胸痛', '呼吸困难', '晕倒', '吐血', '意识异常', '出血', '昏迷']
+  const isUrgentInput = urgentKeywords.some((keyword) => chiefComplaint.includes(keyword))
+  const [scenario, setScenario] = React.useState('')
+  const [scenarioName, setScenarioName] = React.useState('')
+  const [questions, setQuestions] = React.useState<Question[]>([])
+  const [currentQuestionIndex, setCurrentQuestionIndex] = React.useState(0)
+  const [answers, setAnswers] = React.useState<Answer[]>([])
+  const [selectedValues, setSelectedValues] = React.useState<string[]>([])
+  const [textAnswer, setTextAnswer] = React.useState('')
+  const [extraText, setExtraText] = React.useState('')
+  const [result, setResult] = React.useState<Result | null>(null)
+  const [activeRecord, setActiveRecord] = React.useState<ConsultationRecord | null>(null)
   const [records, setRecords] = React.useState<ConsultationRecord[]>([])
-  const [chatMessages, setChatMessages] = useSessionState<ChatMessage[]>('carecue_chatMessages', [])
-  const [chatInput, setChatInput] = useSessionState('carecue_chatInput', '')
+  const [chatMessages, setChatMessages] = React.useState<ChatMessage[]>([])
+  const [chatInput, setChatInput] = React.useState('')
   const [message, setMessage] = React.useState('')
   const [copyLabel, setCopyLabel] = React.useState('复制摘要')
   const [isChatting, setIsChatting] = React.useState(false)
@@ -513,10 +494,10 @@ function App() {
 
       {view === 'consult' ? (
         <section className="workspace">
-          <div className="workspace-header">
+          <div className="workspace-header compact-header">
             <span className="eyebrow">阶段 2 原型</span>
-            <h1>先说哪里不舒服，再一步步补齐关键信息</h1>
-            <p>规则原型覆盖头晕、胸痛、咳嗽三类场景。未补齐关键字段前，不输出确定性疾病判断。</p>
+            <h1 className="consult-title">先说哪里不舒服，再一步步补齐关键信息</h1>
+            <p>已支持真实场景。以下示例可作为引导辅助填写。未补齐关键字段前，不输出确定性疾病判断。</p>
           </div>
 
           {!questions.length ? (
@@ -527,8 +508,8 @@ function App() {
                   <textarea
                     value={chiefComplaint}
                     onChange={(event) => setChiefComplaint(event.target.value)}
-                    placeholder="例如：我爸最近总是头晕，站起来更明显"
-                    rows={7}
+                    placeholder="比如：我爸最近总头晕，站起来更明显。"
+                    rows={3}
                   />
                 </label>
                 <div className="example-row">
@@ -543,10 +524,10 @@ function App() {
                   <ArrowRight size={18} />
                 </button>
               </div>
-              <aside className="urgent-panel">
-                <AlertTriangle size={24} />
-                <h2>紧急情况优先线下处理</h2>
-                <p>胸痛伴呼吸困难、突发一侧肢体无力、说话不清、意识模糊、大量出血等情况，不建议等待线上整理结果。</p>
+              <aside className={`urgent-panel ${isUrgentInput ? 'urgent-active' : 'urgent-default'}`}>
+                {isUrgentInput ? <AlertTriangle size={24} /> : <Info size={24} />}
+                <h2>{isUrgentInput ? '紧急情况优先线下处理' : '安全提醒'}</h2>
+                <p>出现胸痛伴呼吸困难、突发剧烈头痛、一侧肢体无力、意识模糊、大量出血或严重过敏等情况，不建议等待线上整理结果，请优先线下急诊。</p>
               </aside>
             </div>
           ) : (

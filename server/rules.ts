@@ -1,4 +1,4 @@
-export type ScenarioKey = 'dizziness' | 'chestPain' | 'cough'
+export type ScenarioKey = 'dizziness' | 'chestPain' | 'cough' | 'general'
 
 export type QuestionOption = {
   label: string
@@ -237,10 +237,64 @@ export const scenarios: ScenarioConfig[] = [
       },
     ],
   },
+  {
+    key: 'general',
+    name: '综合健康咨询',
+    match: /.*/,
+    questions: [
+      ...sharedQuestions,
+      {
+        key: 'duration',
+        text: '这个情况大概出现多久了？',
+        type: 'single',
+        required: true,
+        options: [
+          { label: '刚出现不久（不到1天）', value: 'less_than_day' },
+          { label: '几天了', value: 'few_days' },
+          { label: '超过 1 周', value: 'over_week' },
+          { label: '反复很久了', value: 'chronic' },
+          { label: '不清楚', value: 'unknown' },
+        ],
+      },
+      {
+        key: 'general_red_flags',
+        text: '有没有伴随以下任何一种危险情况？',
+        type: 'multi',
+        required: true,
+        options: [
+          { label: '呼吸困难或喘不上气', value: 'breathing_difficulty' },
+          { label: '突发剧烈胸痛', value: 'chest_pain' },
+          { label: '意识模糊或晕倒', value: 'fainting' },
+          { label: '说话不清或一侧肢体无力', value: 'limb_weakness' },
+          { label: '大量出血、呕血或黑便', value: 'severe_bleeding' },
+          { label: '都没有', value: 'none' },
+          { label: '不清楚', value: 'unknown' },
+        ],
+      },
+      {
+        key: 'other_symptoms',
+        text: '除了刚才说的，还有其他不舒服吗？',
+        type: 'text',
+        placeholder: '例如：发烧、恶心、哪里痛',
+      },
+      {
+        key: 'history',
+        text: '以前有没有高血压、糖尿病、心脏病等基础病？',
+        type: 'text',
+        placeholder: '没有也可以填“无”',
+      },
+      {
+        key: 'medication',
+        text: '目前有没有正在吃什么药？',
+        type: 'text',
+        placeholder: '没有也可以填“无”',
+      },
+    ],
+  },
 ]
 
 export function identifyScenario(input: string): ScenarioConfig {
-  return scenarios.find((scenario) => scenario.match.test(input)) ?? scenarios[0]
+  return scenarios.find((scenario) => scenario.key !== 'general' && scenario.match.test(input)) ?? scenarios.find(s => s.key === 'general')!
 }
 
 export function getScenario(key: string): ScenarioConfig | undefined {
@@ -269,6 +323,8 @@ export function buildResult(
     'fainting',
     'bloody_sputum',
     'high_fever',
+    'chest_pain',
+    'severe_bleeding'
   )
 
   let urgencyLevel: RuleResult['urgencyLevel'] = 'C'
@@ -351,6 +407,26 @@ function buildScenarioSpecificResult(scenarioKey: ScenarioKey) {
       ],
       dailyAdvice: ['观察体温、呼吸频率和痰色变化', '多饮水、避免烟雾和冷空气刺激', '不要自行长期使用抗生素或强力止咳药'],
       uncertaintyItems: ['缺少听诊、血氧、胸片或感染指标时，不能确认病因。'],
+    }
+  }
+
+  if (scenarioKey === 'general') {
+    return {
+      departmentSuggestion: '全科医学科、急诊科（视红旗信号而定）',
+      possibleDirections: [
+        {
+          title: '系统性疾病排查',
+          support: ['主诉未明确归类为头晕、胸痛或咳嗽', '需要结合伴随症状进一步评估'],
+          caution: ['出现任何红旗信号需优先就医'],
+        },
+        {
+          title: '常见健康问题或自限性不适',
+          support: ['如果症状轻微且短期内无明显进展'],
+          caution: ['线上规则仅作为信息整理辅助'],
+        },
+      ],
+      dailyAdvice: ['注意休息并观察症状演变', '记录症状出现的时间和诱发因素', '不要自行盲目服药'],
+      uncertaintyItems: ['因为症状不够具体或多变，线上无法给出明确方向，必须结合医生查体。'],
     }
   }
 

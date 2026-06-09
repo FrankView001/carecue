@@ -28,9 +28,9 @@ const tests: TestCase[] = [
     },
   },
   {
-    name: 'identifyScenario falls back to dizziness for unsupported symptoms',
+    name: 'identifyScenario falls back to general for unsupported symptoms',
     run: () => {
-      assert.equal(identifyScenario('胃有点不舒服').key, 'dizziness')
+      assert.equal(identifyScenario('胃有点不舒服').key, 'general')
     },
   },
   {

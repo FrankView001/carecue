@@ -16,6 +16,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@mendable/firecrawl-js": "^4.25.2",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "bcrypt": "^6.0.0",
@@ -27,6 +28,7 @@
     "jsonwebtoken": "^9.0.3",
     "lucide-react": "^1.17.0",
     "morgan": "^1.11.0",
+    "openai": "^6.42.0",
     "pg": "^8.21.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",

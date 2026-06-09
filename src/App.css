@@ -421,6 +421,11 @@ textarea {
   font-size: clamp(34px, 5vw, 56px);
 }
 
+.workspace-header h1.consult-title {
+  font-size: clamp(24px, 4vw, 32px);
+  font-weight: 600;
+}
+
 .consult-grid,
 .question-layout,
 .result-grid,
@@ -461,9 +466,26 @@ textarea {
 
 .urgent-panel {
   display: block;
+  transition: all 0.3s ease;
 }
 
-.urgent-panel svg {
+.urgent-panel.urgent-default {
+  color: var(--muted-ink);
+  background: #f8fbfa;
+  border-color: var(--line);
+}
+
+.urgent-panel.urgent-default svg {
+  color: #08766f;
+}
+
+.urgent-panel.urgent-active {
+  color: #7b2f19;
+  background: #fff5e8;
+  border-color: rgba(192, 96, 36, 0.24);
+}
+
+.urgent-panel.urgent-active svg {
   color: #b64b2f;
 }
 
