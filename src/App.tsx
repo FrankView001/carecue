@@ -122,6 +122,7 @@ type ChatMessage = {
   role: 'assistant' | 'user'
   content: string
   kind?: 'followup' | 'emergency' | 'final_report' | 'stage_report'
+  followupMode?: AgentFollowupQuestion['type']
   questions?: AgentFollowupQuestion[]
   /** 本条回复的可审计分析过程（可折叠展示） */
   process?: string[]
@@ -334,7 +335,7 @@ function App() {
       {view !== 'aiChat' && (
         <header className="topbar">
           <button className="brand-button" onClick={() => setView('home')} type="button">
-            <span className="brand-mark">
+            <span className={`brand-mark${view === 'home' ? ' brand-mark--beating' : ''}`}>
               <HeartPulse size={22} />
             </span>
             <span>
@@ -414,7 +415,7 @@ function App() {
           <div className="auth-copy">
             <ShieldCheck size={34} />
             <h1>先确认身份，再保存健康记录</h1>
-            <p>阶段 2 从真实登录开始，咨询记录只归属当前用户。密码会哈希存储，核心业务数据写入 PostgreSQL。</p>
+            <p>登录后，咨询记录只归你本人所有，方便自己查看、家人了解，或带去医院沟通。</p>
             <div className="safety-strip">
               <AlertTriangle size={18} />
               问康不是确诊工具；出现胸痛伴呼吸困难、说话不清、肢体无力等情况，请优先线下急诊。
@@ -454,9 +455,9 @@ function App() {
       {view === 'consult' ? (
         <section className="workspace">
           <div className="workspace-header compact-header">
-            <span className="eyebrow">CareCue Agent 3.0</span>
-            <h1 className="consult-title">先说哪里不舒服，AI 会一步步补齐关键信息</h1>
-            <p>由 3.0 智能体驱动：先核查危险信号，再分析可能方向，信息足够时自动生成报告。未补齐关键字段前，不输出确定性疾病判断。</p>
+            <span className="eyebrow">就医前症状整理</span>
+            <h1 className="consult-title">先用一句话说哪里不舒服，问康会帮你问清关键信息</h1>
+            <p>先核查是否有危险信号，再整理可能方向、日常处理和就医建议。信息不足时只做阶段性整理，不给出确诊结论。</p>
           </div>
 
           <div className="consult-grid">
@@ -478,7 +479,7 @@ function App() {
                 ))}
               </div>
               <button className="primary-button" disabled={isChatting} onClick={startConsultation} type="button">
-                {isChatting ? '正在分析' : '开始咨询'}
+                {isChatting ? '正在整理' : '开始说明症状'}
                 <ArrowRight size={18} />
               </button>
             </div>
@@ -509,7 +510,8 @@ function App() {
         <section className="workspace">
           <div className="workspace-header compact-header">
             <span className="eyebrow">历史记录</span>
-            <h1>只展示当前登录用户的咨询记录</h1>
+            <h1>已保存的完整整理报告</h1>
+            <p className="history-note">仅「症状处理报告」或「急症提醒」会保存；对话中的阶段性整理不会出现在这里。</p>
           </div>
           <div className="history-list">
             {records.length ? records.map((record) => (
@@ -523,7 +525,7 @@ function App() {
                 </button>
               </article>
             )) : (
-              <div className="empty-state">暂无历史咨询。完成一次咨询后，这里会从数据库读取记录。</div>
+              <div className="empty-state">暂无已保存报告。完成一次咨询并生成完整报告后，会显示在这里。</div>
             )}
           </div>
         </section>
@@ -558,7 +560,7 @@ function HomeView({ onStart }: { onStart: () => void }) {
             就医前症状整理与日常健康咨询助手
           </span>
           <h1>就医前，先把症状说清楚</h1>
-          <p>通过追问、风险分级和医生沟通摘要，帮助长辈和家人把零散描述整理成可就医、可转发、可保存的信息。</p>
+          <p>通过对话整理症状、核查危险信号和医生沟通摘要，帮助长辈和家人把零散描述变成可就医、可转发、可保存的信息。</p>
           <div className="hero-actions">
             <button className="primary-button" onClick={onStart} type="button">
               立即体验
@@ -578,41 +580,69 @@ function HomeView({ onStart }: { onStart: () => void }) {
       <section className="method-band">
         <article>
           <ClipboardList size={26} />
-          <h2>先追问</h2>
-          <p>按就医逻辑补齐年龄、时间、程度、伴随症状、病史和用药。</p>
+          <h2>说清楚症状</h2>
+          <p>用对话补齐年龄、时间、程度、伴随症状、病史和用药，不用写长文。</p>
         </article>
         <article>
           <ShieldCheck size={26} />
-          <h2>再分级</h2>
-          <p>红旗症状规则前置，高风险场景优先提示急诊。</p>
+          <h2>核查危险信号</h2>
+          <p>优先确认是否有需要急诊的情况，再查阅权威资料整理可能方向（不确诊）。</p>
         </article>
         <article>
           <FileText size={26} />
-          <h2>再整理</h2>
-          <p>生成客观病情摘要，方便发给家人或带去医院。</p>
+          <h2>给出可执行建议</h2>
+          <p>整理日常处理、就医时机和医生沟通摘要，方便转发给家人或带去医院。</p>
         </article>
-      </section>
 
-      <section className="boundary-section" id="boundary">
-        <div>
-          <span className="eyebrow">Safety boundary</span>
-          <h2>医疗健康场景里，克制比聪明更重要</h2>
-        </div>
-        <ul>
-          <li>不输出“确诊为”“一定是”等确定性诊断措辞。</li>
-          <li>胸痛、肢体无力、说话不清、呼吸困难等红旗信号优先升级。</li>
-          <li>结果保留依据、不确定项和线下就医建议。</li>
-        </ul>
+        <footer className="method-band-footer" id="boundary">
+          <div className="method-band-footer-head">
+            <span className="method-band-footer-label">安全边界</span>
+            <p className="method-band-footer-lead">就医前整理，不作确诊结论</p>
+          </div>
+          <ul className="method-band-footer-list">
+            <li>
+              <ShieldCheck size={18} aria-hidden />
+              <span>提供可能方向与阶段性判断，不替代医生面诊与必要检查。</span>
+            </li>
+            <li>
+              <AlertTriangle size={18} aria-hidden />
+              <span>胸痛、呼吸困难、言语异常、肢体无力等危险信号将优先提示就医。</span>
+            </li>
+            <li>
+              <ListChecks size={18} aria-hidden />
+              <span>建议附有依据说明、不确定项及线下就诊指引。</span>
+            </li>
+          </ul>
+        </footer>
       </section>
     </>
   )
 }
 
+const DOMAIN_LABELS: Record<string, string> = {
+  throat_respiratory: '咽喉与呼吸不适',
+  gastrointestinal: '胃肠不适',
+  eye_discomfort: '眼部不适',
+  skin_mild: '皮肤轻微问题',
+  chest_pain: '胸痛胸闷',
+  headache: '头晕头痛',
+  limb_pain: '肢体疼痛',
+  fever: '发热相关',
+  general_discomfort: '全身不适',
+  unknown: '症状咨询',
+}
+
 const RISK_LABELS: Record<AgentRiskLevel, string> = {
-  R0: 'R0 · 暂未发现明显危险信号',
-  R1: 'R1 · 低风险，可先观察',
-  R2: 'R2 · 中风险，建议尽快就医',
-  R3: 'R3 · 高风险，优先急诊',
+  R0: '暂未发现明显危险信号',
+  R1: '低风险，可先观察并继续补充信息',
+  R2: '中风险，建议尽快就医评估',
+  R3: '高风险，优先急诊或急救',
+}
+
+const FOLLOWUP_MODE_TITLES: Record<AgentFollowupQuestion['type'], string> = {
+  risk_probe: '问康 · 危险信号核查',
+  differential: '问康 · 补充关键信息',
+  care_plan: '问康 · 日常处理相关',
 }
 
 const LIKELIHOOD_LABELS: Record<string, string> = {
@@ -623,10 +653,25 @@ const LIKELIHOOD_LABELS: Record<string, string> = {
 }
 
 const MESSAGE_KIND_TITLES: Record<NonNullable<ChatMessage['kind']>, string> = {
-  followup: '问康 AI · 追问',
+  followup: '问康 · 补充信息',
   emergency: '急症提醒',
-  final_report: '分析报告',
-  stage_report: '阶段性整理',
+  final_report: '症状处理报告',
+  stage_report: '阶段性整理（非最终结论）',
+}
+
+function formatDomainLabel(domain?: string) {
+  if (!domain) return '症状咨询'
+  return DOMAIN_LABELS[domain] ?? '症状咨询'
+}
+
+function assistantMessageTitle(message: ChatMessage) {
+  if (message.role !== 'assistant') return '补充说明'
+  if (message.kind === 'followup') {
+    const mode = message.followupMode ?? message.questions?.[0]?.type
+    if (mode) return FOLLOWUP_MODE_TITLES[mode]
+  }
+  if (message.kind) return MESSAGE_KIND_TITLES[message.kind]
+  return '问康'
 }
 
 function ChatView({
@@ -663,7 +708,7 @@ function ChatView({
             <ArrowLeft size={18} />
             返回
           </button>
-          <h2>{snapshot?.primaryDomain && snapshot.primaryDomain !== 'unknown' ? `${snapshot.primaryDomain} 咨询` : '症状咨询'}</h2>
+          <h2>{formatDomainLabel(snapshot?.primaryDomain)}</h2>
           <div className="spacer"></div>
         </div>
 
@@ -685,7 +730,7 @@ function ChatView({
                   : <User size={28} />}
               </div>
               <div className="card-content">
-                <h3>{item.role === 'assistant' ? MESSAGE_KIND_TITLES[item.kind ?? 'stage_report'] ?? '问康 AI' : '补充诉求'}</h3>
+                <h3>{item.role === 'assistant' ? assistantMessageTitle(item) : '你的补充'}</h3>
                 {item.process?.length ? (
                   <details className="process-disclosure">
                     <summary>分析过程（{item.process.length} 步）</summary>
@@ -712,7 +757,7 @@ function ChatView({
             <div className="chat-card message-card assistant">
                <div className="card-icon ai-icon"><Bot size={28} /></div>
                <div className="card-content">
-                 <h3>问康 AI</h3>
+                 <h3>问康 · 正在整理</h3>
                  {liveProcess.length > 0 ? (
                    <ul className="live-process-list">
                      {liveProcess.map((step, stepIndex) => (
@@ -722,7 +767,7 @@ function ChatView({
                      ))}
                    </ul>
                  ) : (
-                   <p>正在分析你的症状...</p>
+                   <p>正在整理症状并核查风险信号，请稍候...</p>
                  )}
                </div>
             </div>
@@ -734,7 +779,7 @@ function ChatView({
           <textarea
             value={chatInput}
             onChange={(event) => onInputChange(event.target.value)}
-            placeholder="回答上面的追问，或继续补充症状、病史、用药等"
+            placeholder="回答上面的问题，或继续补充症状、病史、用药等"
             rows={1}
           />
           <button className="primary-button send-btn" disabled={!chatInput.trim() || isChatting} type="submit" aria-label="发送">
@@ -745,7 +790,7 @@ function ChatView({
         <div className="chat-actions-redesigned">
           <p>
             <Info size={14} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} />
-            信息足够时 AI 会自动生成分析报告；以上内容不是正式确诊。
+            信息足够时会自动生成可带去医院整理的症状处理报告；以上内容均非确诊结论。
           </p>
         </div>
       </div>
@@ -785,7 +830,7 @@ function ChatView({
               <div className="item-icon"><Info size={18} /></div>
               <div className="item-content">
                 <span className="item-label">评估说明</span>
-                <span className="item-value">{snapshot?.riskReason || '等待 AI 分析'}</span>
+                <span className="item-value">{snapshot?.riskReason || '正在根据你的描述整理'}</span>
               </div>
             </div>
             <div className="overview-item">
@@ -900,7 +945,7 @@ function ResultView({
         <section className="ai-summary-section">
           <div className="section-title-row">
             <Sparkles size={22} />
-            <h2>AI 综合分析</h2>
+            <h2>综合整理说明</h2>
           </div>
           <p>{result.aiSummary}</p>
           {result.aiModel ? <span className="model-pill">{result.aiModel}</span> : null}
@@ -911,7 +956,7 @@ function ResultView({
         <Search size={20} />
         <div>
           <strong>{result.webSearchUsed ? '已请求联网核查' : '未启用联网核查'}</strong>
-          <span>{result.webSearchUsed ? '报告结合了服务端搜索工具返回的背景资料，但仍不是确诊结论。' : '当前报告基于对话症状信息与 Agent 综合分析生成。'}</span>
+          <span>{result.webSearchUsed ? '报告结合了权威来源核查结果，但仍不是确诊结论。' : '当前报告基于对话症状整理与联网证据生成，不是确诊结论。'}</span>
         </div>
       </section>
 
@@ -971,7 +1016,7 @@ function ResultView({
           {missingInformation.length ? (
             <ul>{missingInformation.map((item) => <li key={item}>{item}</li>)}</ul>
           ) : (
-            <p>本次信息已基本覆盖当前分析所需的关键字段。</p>
+            <p>本次信息已基本覆盖当前整理所需的关键字段。</p>
           )}
         </section>
       </div>
@@ -1129,15 +1174,15 @@ function formatDate(value: string) {
 
 function aiStatusLabel(status: Result['aiStatus']) {
   if (status === 'fallback') {
-    return '本次 AI 分析暂不可用，已展示规则分析结果。'
+    return '本次智能整理暂不可用，已给出基础安全提示与观察建议。'
   }
 
   if (status === 'disabled') {
-    return 'AI 分析未启用，当前展示规则分析结果。'
+    return '智能整理未启用，当前仅展示基础安全提示。'
   }
 
   if (status === 'error') {
-    return 'AI 分析返回异常，当前展示规则分析结果。'
+    return '智能整理返回异常，当前仅展示基础安全提示。'
   }
 
   return ''
@@ -1148,6 +1193,7 @@ function agentResponseToChatMessage(response: AgentResponse): ChatMessage {
     return {
       role: 'assistant',
       kind: 'followup',
+      followupMode: response.mode,
       content: response.intro,
       questions: response.questions,
     }

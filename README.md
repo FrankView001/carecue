@@ -13,7 +13,7 @@
 - bcrypt 密码哈希
 - JWT httpOnly Cookie 会话
 - 用户隔离的咨询记录 API（列表、详情、删除）
-- Agent 3.0 对话咨询（`POST /api/agent/consult`、`POST /api/agent/consult/stream`）
+- 就医前症状整理对话咨询（`POST /api/agent/consult`、`POST /api/agent/consult/stream`）
 - SSE 流式展示可审计分析过程
 - 红旗风险识别与急诊提示
 - Firecrawl 联网核查（需配置 `FIRECRAWL_API_KEY`）
