@@ -25,4 +25,12 @@ dist-ssr
 
 /src/generated/prisma
 /server/generated/prisma
+
+# Env files
 .env
+.env.*
+!.env.example
+
+# Trae specific
+.trae
+

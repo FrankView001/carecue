@@ -1,0 +1,23 @@
+FROM node:20-alpine AS builder
+WORKDIR /app
+
+# 复制 package.json 和 package-lock.json
+COPY package*.json ./
+
+# 安装依赖
+RUN npm ci
+
+# 复制源代码并构建前端
+COPY . .
+RUN npm run build
+
+# 使用 Nginx 托管构建后的静态文件
+FROM nginx:alpine
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+# 复制自定义 Nginx 配置
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]

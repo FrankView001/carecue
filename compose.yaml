@@ -7,8 +7,6 @@ services:
       POSTGRES_USER: carecue
       POSTGRES_PASSWORD: carecue
       POSTGRES_DB: carecue
-    ports:
-      - "5432:5432"
     volumes:
       - carecue-postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -16,6 +14,48 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: carecue-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://carecue:carecue@postgres:5432/carecue?schema=public
+      - PORT=4300
+      - HOST=0.0.0.0
+      - JWT_SECRET=${JWT_SECRET}
+      - AI_ENABLED=${AI_ENABLED}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - FIRECRAWL_API_KEY=${FIRECRAWL_API_KEY}
+      - CLIENT_ORIGIN=${CLIENT_ORIGIN}
+      # 限制 Node.js 内存使用，防止在 2G 机器上 OOM 导致进程被杀
+      - NODE_OPTIONS=--max-old-space-size=512
+    command: >
+      sh -c "npx prisma generate && npx prisma migrate deploy && npx tsx server/index.ts"
+    deploy:
+      resources:
+        limits:
+          memory: 800M
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    container_name: carecue-web
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+    deploy:
+      resources:
+        limits:
+          memory: 300M
 
 volumes:
   carecue-postgres-data:

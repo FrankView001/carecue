@@ -107,6 +107,14 @@ main, header, footer { position: relative; z-index: 1; }
   transition: transform .2s ease, box-shadow .2s ease, background .2s;
   box-shadow: 0 8px 20px rgba(10, 110, 102, 0.24);
 }
+.nav-links a.btn,
+.nav-links a.btn:hover,
+.nav-links a.btn:visited,
+.cta-final .btn,
+.cta-final .btn:hover,
+.cta-final .btn:visited {
+  color: #fff;
+}
 .btn:hover { transform: translateY(-2px); background: var(--teal-deep); box-shadow: 0 12px 26px rgba(10, 110, 102, 0.3); }
 .btn.ghost {
   background: transparent;
@@ -186,10 +194,12 @@ main, header, footer { position: relative; z-index: 1; }
   bottom: -26px;
   width: 200px;
   height: 56px;
-  background: #fff;
+  background: rgba(250, 246, 238, 0.88);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   border: 1px solid var(--line);
   border-radius: 14px;
-  box-shadow: 0 14px 30px rgba(29,51,49,.12);
+  box-shadow: 0 10px 24px rgba(29, 51, 49, 0.07);
   display: grid;
   place-items: center;
   overflow: hidden;
@@ -578,7 +588,7 @@ section { padding: 86px 0; }
   letter-spacing: 1px;
   margin-bottom: 16px;
 }
-.cta-final p { color: var(--ink-soft); font-size: 17px; margin-bottom: 34px; }
+.cta-final p { color: var(--ink); font-size: 17px; margin-bottom: 34px; }
 
 footer {
   border-top: 1px solid var(--line);
@@ -872,7 +882,7 @@ footer .wrap { display: flex; justify-content: space-between; gap: 20px; flex-wr
       <h2 class="reveal">把"就医前的不安"，<br/>变成一份从容的准备</h2>
       <p class="reveal" style="--d:.1s">欢迎预约完整产品演示，体验真实咨询全流程。</p>
       <div class="reveal" style="--d:.18s">
-        <a class="btn" href="#" style="font-size:17px; padding:15px 40px;">预约产品演示</a>
+        <a class="btn" href="#" style="font-size:17px; padding:15px 40px; color:#fff; font-weight:600;">预约产品演示</a>
       </div>
     </div>
   </section>

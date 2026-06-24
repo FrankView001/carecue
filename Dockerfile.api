@@ -1,0 +1,19 @@
+FROM node:20-alpine
+WORKDIR /app
+
+# 安装必要的系统依赖（例如 OpenSSL，用于 Prisma）
+RUN apk add --no-cache openssl
+
+# 复制 package.json 和 package-lock.json
+COPY package*.json ./
+
+# 安装依赖
+RUN npm ci
+
+# 复制所有源代码
+COPY . .
+
+# 暴露后端端口
+EXPOSE 4300
+
+# 启动命令在 docker-compose.yml 中定义（包含 migrate 和 start）
