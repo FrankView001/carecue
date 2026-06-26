@@ -33,11 +33,13 @@ export const caseAnalyzeTool = defineTool({
         system: prompt.system,
         user: prompt.user,
         temperature: 0.2,
+        trace: { traceLogger: ctx.traceLogger, caseId: ctx.caseId, node: 'case.analyze' },
       })
       return sanitizeAnalysis(result, ctx.state)
     } catch (error) {
       if (!(error instanceof LlmUnavailableError)) throw error
       ctx.traceLogger.log(ctx.caseId, 'llm_fallback', { reason: 'case.analyze 使用症状域种子降级' })
+      ctx.markFallback('case.analyze: LLM 不可用，使用症状域种子降级，结论标注为低置信参考')
       return fallbackAnalysis(ctx.state)
     }
   },

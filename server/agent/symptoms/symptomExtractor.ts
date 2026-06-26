@@ -62,6 +62,7 @@ export const symptomExtractTool = defineTool({
         system: prompt.system,
         user: prompt.user,
         temperature: 0.1,
+        trace: { traceLogger: ctx.traceLogger, caseId: ctx.caseId, node: 'symptom.extract' },
       })
       return { ...result, userOriginalText: userMessage }
     } catch (error) {
@@ -69,6 +70,7 @@ export const symptomExtractTool = defineTool({
       ctx.traceLogger.log(ctx.caseId, 'llm_fallback', {
         reason: 'symptom.extract 使用词典规则降级抽取',
       })
+      ctx.markFallback('symptom.extract: LLM 不可用，使用词典规则降级抽取')
       return heuristicExtract(userMessage)
     }
   },

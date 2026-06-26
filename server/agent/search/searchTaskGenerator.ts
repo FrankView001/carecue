@@ -9,6 +9,7 @@ import type { LlmClient } from '../llm/llmClient.ts'
 import { LlmUnavailableError } from '../llm/llmClient.ts'
 import { buildGenerateSearchTasksPrompt } from '../llm/prompts/generateSearchTasks.prompt.ts'
 import { getDomainConfig } from '../symptoms/symptomDomainConfig.ts'
+import type { TraceLogger } from '../logs/traceLogger.ts'
 
 const searchTasksOutputSchema = z.object({
   tasks: z.array(medicalSearchTaskSchema),
@@ -18,6 +19,7 @@ export async function generateSearchTasks(
   state: CaseState,
   decisionGoal: string,
   llm: LlmClient,
+  traceLogger?: TraceLogger,
 ): Promise<MedicalSearchTask[]> {
   try {
     const prompt = buildGenerateSearchTasksPrompt(state, decisionGoal)
@@ -26,10 +28,12 @@ export async function generateSearchTasks(
       schemaName: 'search_tasks',
       system: prompt.system,
       user: prompt.user,
+      trace: traceLogger ? { traceLogger, caseId: state.caseId, node: 'search.generate_tasks' } : undefined,
     })
     return result.tasks
   } catch (error) {
     if (!(error instanceof LlmUnavailableError)) throw error
+    traceLogger?.log(state.caseId, 'llm_fallback', { reason: 'search.generate_tasks: LLM 不可用，使用症状域检索模板降级' })
     return buildTemplateSearchTasks(state)
   }
 }

@@ -50,18 +50,59 @@ export class SearchPipeline {
     })
 
     if (normalizedTasks.length === 0) {
-      return this.fail(caseId, 'SEARCH_NO_RESULT', '没有可执行的检索任务。', normalizedTasks)
+      return this.fail(caseId, 'SEARCH_NO_RESULT', '没有生成检索 query（query generation 为空）。', normalizedTasks)
     }
 
-    // 1. 并发搜索
+    // 1. 并发搜索（逐个 task 记录完整请求/响应，区分接口报错 vs 接口返回空 vs 超时）
     const searchLimit = createLimiter(PIPELINE_CONCURRENCY.search)
     const searchSettled = await Promise.allSettled(
-      normalizedTasks.map((task) => searchLimit(() => this.search.search(task))),
+      normalizedTasks.map((task) =>
+        searchLimit(async () => {
+          const startedAt = Date.now()
+          try {
+            const hits = await this.search.search(task)
+            this.traceLogger.logSearchCall(caseId, {
+              node: 'search.firecrawl',
+              query: task.query,
+              purpose: task.purpose,
+              provider: 'firecrawl',
+              requestParams: { preferredSources: task.preferredSources, language: task.language },
+              rawCount: hits.length,
+              durationMs: Date.now() - startedAt,
+              status: hits.length > 0 ? 'success' : 'failed',
+              failureReason: hits.length === 0 ? '接口返回为空（无结果）' : undefined,
+            })
+            return hits
+          } catch (error) {
+            const isTimeout = /timeout|ETIMEDOUT|ECONNABORTED/i.test(String(error))
+            this.traceLogger.logSearchCall(caseId, {
+              node: 'search.firecrawl',
+              query: task.query,
+              purpose: task.purpose,
+              provider: 'firecrawl',
+              requestParams: { preferredSources: task.preferredSources, language: task.language },
+              durationMs: Date.now() - startedAt,
+              status: 'failed',
+              failureReason: isTimeout ? '请求超时' : '搜索接口报错',
+              error: { message: String(error) },
+            })
+            throw error
+          }
+        }),
+      ),
     )
     const rawResults: RawSearchHit[] = collectSuccessful(searchSettled).flat()
+    const searchErrors = searchSettled.filter((r) => r.status === 'rejected').map((r) => String((r as PromiseRejectedResult).reason))
 
     if (rawResults.length === 0) {
-      return this.fail(caseId, 'SEARCH_NO_RESULT', '联网搜索没有返回结果。', normalizedTasks)
+      const allFailed = searchErrors.length === normalizedTasks.length && normalizedTasks.length > 0
+      return this.fail(
+        caseId,
+        'SEARCH_NO_RESULT',
+        allFailed ? `搜索接口报错：${searchErrors.join('; ')}` : '联网搜索接口返回为空（无结果）。',
+        normalizedTasks,
+        { searchErrors },
+      )
     }
 
     // 2. 来源过滤
@@ -74,7 +115,7 @@ export class SearchPipeline {
     })
 
     if (filtered.accepted.length === 0) {
-      return this.fail(caseId, 'ALL_SOURCES_REJECTED', '所有来源都被过滤（低质量来源）。', normalizedTasks, {
+      return this.fail(caseId, 'ALL_SOURCES_REJECTED', '结果被白名单过滤为空（所有来源都被过滤，低质量来源）。', normalizedTasks, {
         rejected: filtered.rejected,
       })
     }
@@ -94,7 +135,7 @@ export class SearchPipeline {
     const extractLimit = createLimiter(PIPELINE_CONCURRENCY.evidenceExtract)
     const evidenceSettled = await Promise.allSettled(
       fetchedPages.map((page) =>
-        extractLimit(() => extractEvidenceFromPage(page, state, this.llm)),
+        extractLimit(() => extractEvidenceFromPage(page, state, this.llm, this.traceLogger)),
       ),
     )
     const extractedEvidence = collectSuccessful(evidenceSettled).filter(
@@ -102,7 +143,7 @@ export class SearchPipeline {
     )
 
     if (extractedEvidence.length === 0) {
-      return this.fail(caseId, 'EVIDENCE_EMPTY', '未能从来源中抽取有效证据。', normalizedTasks)
+      return this.fail(caseId, 'EVIDENCE_EMPTY', '结果解析失败：未能从来源中抽取有效证据（页面内容与症状无关或抽取失败）。', normalizedTasks)
     }
 
     // 5. 校验 + 聚合

@@ -47,10 +47,12 @@ export const carePlanGenerateTool = defineTool({
         system: prompt.system,
         user: prompt.user,
         temperature: 0.2,
+        trace: { traceLogger: ctx.traceLogger, caseId: ctx.caseId, node: 'care_plan.generate' },
       })
     } catch (error) {
       if (!(error instanceof LlmUnavailableError)) throw error
       ctx.traceLogger.log(ctx.caseId, 'llm_fallback', { reason: 'care_plan.generate 使用证据直出降级' })
+      ctx.markFallback('care_plan.generate: LLM 不可用，直接汇总证据原文作为护理建议')
       return fallbackCarePlan(ctx.state)
     }
   },

@@ -5,7 +5,8 @@ import { randomUUID } from 'node:crypto'
 import type { CaseState, CaseStateUpdateOutput, FollowupQuestion } from './CaseState.ts'
 import { createInitialCaseState } from './CaseState.ts'
 import { mergeCaseState } from './caseStateMerger.ts'
-import type { TraceLogger } from '../logs/traceLogger.ts'
+import type { TraceLogger, FieldDiff } from '../logs/traceLogger.ts'
+import { getByPath } from './stateFields.ts'
 
 export interface CaseStore {
   get(caseId: string): Promise<{ state: CaseState; version: number } | undefined>
@@ -66,10 +67,13 @@ export class CaseStateService {
       const version = record.version + 1
       await this.store.save(caseId, state, version)
 
-      this.traceLogger.log(caseId, 'state_merged', {
-        input: { updateReason: input.updateReason, source: input.source },
-        output: { changedFields, version },
-        reason: input.updateReason,
+      this.traceLogger.logStateChange(caseId, {
+        node: input.updateReason,
+        stateBefore: record.state,
+        statePatch: input.patch,
+        stateAfter: state,
+        stateDiff: buildFieldDiff(record.state, state, changedFields),
+        reason: `${input.updateReason} (source=${input.source}, version=${version})`,
       })
 
       const output: CaseStateUpdateOutput = {
@@ -102,4 +106,23 @@ export class CaseStateService {
     this.mergeQueues.set(caseId, next.catch(() => undefined))
     return next
   }
+}
+
+/** 字段级 diff：标注哪个字段被改了、原值/新值、是否覆盖已有值、是否因空值丢失数据 */
+function buildFieldDiff(before: CaseState, after: CaseState, changedFields: string[]): FieldDiff[] {
+  return changedFields.map((field) => {
+    const beforeValue = getByPath(before, field)
+    const afterValue = getByPath(after, field)
+    const hadValue = beforeValue !== undefined && beforeValue !== null && beforeValue !== '' &&
+      !(Array.isArray(beforeValue) && beforeValue.length === 0)
+    const nowEmpty = afterValue === undefined || afterValue === null || afterValue === '' ||
+      (Array.isArray(afterValue) && afterValue.length === 0)
+    return {
+      field,
+      before: beforeValue,
+      after: afterValue,
+      overwritten: hadValue && JSON.stringify(beforeValue) !== JSON.stringify(afterValue),
+      droppedDueToEmpty: hadValue && nowEmpty,
+    }
+  })
 }

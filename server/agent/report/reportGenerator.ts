@@ -34,10 +34,12 @@ export const reportGenerateTool = defineTool({
         system: prompt.system,
         user: prompt.user,
         temperature: 0.2,
+        trace: { traceLogger: ctx.traceLogger, caseId: ctx.caseId, node: 'report.generate' },
       })
     } catch (error) {
       if (!(error instanceof LlmUnavailableError)) throw error
       ctx.traceLogger.log(ctx.caseId, 'llm_fallback', { reason: 'report.generate 使用模板降级' })
+      ctx.markFallback('report.generate: LLM 不可用，使用 CaseState 模板拼装报告')
       return buildTemplateReport(ctx.state)
     }
   },

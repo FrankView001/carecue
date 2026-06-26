@@ -9,6 +9,7 @@ import { LlmUnavailableError } from '../llm/llmClient.ts'
 import { buildExtractEvidencePrompt } from '../llm/prompts/extractEvidence.prompt.ts'
 import type { FetchedPage } from '../search/sourceFetcher.ts'
 import { extractedFactsSchema, applicableToSchema, type MedicalEvidence } from './evidenceSchema.ts'
+import type { TraceLogger } from '../logs/traceLogger.ts'
 
 const llmEvidenceSchema = z.object({
   relatedHypotheses: z.array(z.string()),
@@ -22,6 +23,7 @@ export async function extractEvidenceFromPage(
   page: FetchedPage,
   state: CaseState,
   llm: LlmClient,
+  traceLogger?: TraceLogger,
 ): Promise<MedicalEvidence | null> {
   try {
     const prompt = buildExtractEvidencePrompt(
@@ -33,6 +35,7 @@ export async function extractEvidenceFromPage(
       schemaName: 'evidence_extraction',
       system: prompt.system,
       user: prompt.user,
+      trace: traceLogger ? { traceLogger, caseId: state.caseId, node: 'evidence.extract' } : undefined,
     })
 
     // 与当前症状无关的证据不进入上下文（§23）
@@ -54,6 +57,7 @@ export async function extractEvidenceFromPage(
     }
   } catch (error) {
     if (!(error instanceof LlmUnavailableError)) throw error
+    traceLogger?.log(state.caseId, 'llm_fallback', { reason: 'evidence.extract: LLM 不可用，仅保留原文摘要降级' })
     // 降级：仅保留摘要，不提取结构化医学事实
     return {
       id: randomUUID(),

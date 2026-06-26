@@ -61,8 +61,18 @@ export async function runCareCueAgent(
 
   let state = await caseStateService.loadOrCreate(input.caseId, input.userId)
   const caseId = state.caseId
+  traceLogger.beginRequest(caseId)
 
-  traceLogger.log(caseId, 'user_input', { input: input.userMessage })
+  traceLogger.log(caseId, 'user_input', {
+    status: 'success',
+    input: {
+      text: input.userMessage,
+      sessionId: caseId,
+      userId: input.userId,
+      turn: state.meta.agentSteps,
+    },
+    stateBefore: state,
+  })
   await messageService.appendUserMessage({ caseId, content: input.userMessage })
   // 用户显式要求联网搜索 -> 标记本轮强制检索一次（决策层据此放行并优先检索）
   const searchRequested = detectSearchRequest(input.userMessage) && webSearchEnabled()
@@ -89,6 +99,7 @@ export async function runCareCueAgent(
     traceLogger,
     llm,
     search,
+    markFallback: () => undefined,
   })
 
   const runTool = async <O>(
@@ -194,7 +205,7 @@ export async function runCareCueAgent(
           intro: questionsResult.output.intro,
         })
         await messageService.appendAssistantMessage(caseId, JSON.stringify(response.questions.map((q) => q.question)), 'followup')
-        traceLogger.log(caseId, 'final_output', { reason: 'followup(risk_probe)' })
+        traceLogger.log(caseId, 'final_output', { reason: 'followup(risk_probe)', status: 'success', output: response })
         return response
       }
     }
@@ -218,7 +229,6 @@ export async function runCareCueAgent(
     })
     nextDecisionDeterministic = false
 
-    traceLogger.logDecision(caseId, decision)
     emit({ type: 'agent_decision', action: decision.action, reason: decision.reason })
     state = await caseStateService.merge(caseId, {
       patch: {
@@ -238,7 +248,7 @@ export async function runCareCueAgent(
       case 'search_medical': {
         let tasks: MedicalSearchTask[] = decision.searchTasks ?? []
         if (tasks.length === 0) {
-          tasks = await generateSearchTasks(state, decision.decisionGoal, llm)
+          tasks = await generateSearchTasks(state, decision.decisionGoal, llm, traceLogger)
         }
 
         emit({ type: 'status', message: '正在检索权威医学资料...' })
@@ -408,7 +418,7 @@ export async function runCareCueAgent(
           intro: result.output.intro,
         })
         await messageService.appendAssistantMessage(caseId, JSON.stringify(selectedQuestions.map((q) => q.question)), 'followup')
-        traceLogger.log(caseId, 'final_output', { reason: 'followup(differential)' })
+        traceLogger.log(caseId, 'final_output', { reason: 'followup(differential)', status: 'success', output: response })
         return response
       }
 
@@ -453,7 +463,7 @@ export async function runCareCueAgent(
             })
             const response = reportRenderer.renderFinalReport(state, templateChecked.fixedReport ?? templateReport)
             await messageService.appendAssistantMessage(caseId, response.rendered, 'final_report')
-            traceLogger.log(caseId, 'final_output', { reason: 'final_report(template_degraded)' })
+            traceLogger.log(caseId, 'final_output', { reason: 'final_report(template_degraded)', status: 'fallback', fallback: true, fallbackReason: '最终报告 LLM 生成/校验失败，使用模板降级输出', output: response })
             return response
           }
           return finish(
@@ -469,7 +479,7 @@ export async function runCareCueAgent(
         const finalReport = checked.fixedReport ?? draft.output
         const response = reportRenderer.renderFinalReport(state, finalReport)
         await messageService.appendAssistantMessage(caseId, response.rendered, 'final_report')
-        traceLogger.log(caseId, 'final_output', { reason: 'final_report' })
+        traceLogger.log(caseId, 'final_output', { reason: 'final_report', status: 'success', output: response })
         return response
       }
 

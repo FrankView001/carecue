@@ -32,6 +32,7 @@ export async function decideAction(input: {
   }
 
   let decision: AgentDecision
+  let usedFallback = false
   try {
     const prompt = buildDecideActionPrompt(state, input.contextSummary)
     decision = await llm.structured({
@@ -40,19 +41,58 @@ export async function decideAction(input: {
       system: prompt.system,
       user: prompt.user,
       temperature: 0.1,
+      trace: { traceLogger, caseId: state.caseId, node: 'agent.decide_action' },
     })
   } catch (error) {
+    usedFallback = true
     if (error instanceof LlmUnavailableError) {
       traceLogger.log(state.caseId, 'llm_fallback', { reason: 'decideAction 使用确定性策略' })
     } else {
       traceLogger.log(state.caseId, 'llm_fallback', {
-        reason: `decideAction LLM 输出异常，使用确定性策略：${String(error).slice(0, 200)}`,
+        reason: `decideAction LLM 输出异常，使用确定性策略：${String(error)}`,
       })
     }
     decision = deterministicDecision(state)
   }
 
-  return enforceConstraints(decision, state)
+  const finalDecision = enforceConstraints(decision, state)
+  traceLogger.log(state.caseId, 'agent_decision', {
+    decision: finalDecision.action,
+    decisionReason: finalDecision.reason,
+    fallback: usedFallback || finalDecision.action !== decision.action,
+    fallbackReason: usedFallback
+      ? 'LLM 决策不可用或输出异常，已使用确定性策略'
+      : finalDecision.action !== decision.action
+        ? `LLM 提议的动作 "${decision.action}" 违反硬性约束，已由代码改写为 "${finalDecision.action}"`
+        : undefined,
+    decisionConditions: buildDecisionConditions(state, decision, finalDecision),
+    output: finalDecision,
+    status: 'success',
+  })
+
+  return finalDecision
+}
+
+function buildDecisionConditions(state: CaseState, llmDecision: AgentDecision, finalDecision: AgentDecision) {
+  return {
+    llmProposedAction: llmDecision.action,
+    finalAction: finalDecision.action,
+    overridden: llmDecision.action !== finalDecision.action,
+    symptomDomain: state.symptomDomain.primaryDomain,
+    riskLevel: state.risk.level,
+    hasHypotheses: state.hypotheses.length > 0,
+    hypothesesCount: state.hypotheses.length,
+    evidenceCount: state.evidence.length,
+    searchRoundsUsed: state.meta.searchRounds,
+    maxSearchRounds: AGENT_LIMITS.maxSearchRounds,
+    askedQuestionsCount: state.askedQuestions.length,
+    maxAskedQuestionsTotal: AGENT_LIMITS.maxAskedQuestionsTotal,
+    webSearchEnabled: webSearchEnabled(),
+    userForcedSearchActive: userForcedSearchActive(state),
+    unresolvedRedFlags: state.riskProbe.unresolvedRedFlags,
+    missingRiskFields: state.missingInfo.map((m) => m.field),
+    hasCarePlan: Boolean(state.carePlan),
+  }
 }
 
 /** 代码侧约束修正：违反选择规则的决策被改写为合法决策（§8.3） */

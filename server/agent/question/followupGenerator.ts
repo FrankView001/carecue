@@ -58,10 +58,12 @@ export const riskProbeQuestionTool = defineTool({
         system: prompt.system,
         user: prompt.user,
         temperature: 0.2,
+        trace: { traceLogger: ctx.traceLogger, caseId: ctx.caseId, node: 'question.generate_risk_probe' },
       })
       return result
     } catch (error) {
       if (!(error instanceof LlmUnavailableError)) throw error
+      ctx.markFallback('question.generate_risk_probe: LLM 不可用，使用症状域配置的核查问题降级')
       // 降级：直接用症状域配置的核查问题
       return {
         intro: '你提到的症状需要先确认是否存在危险信号。目前信息还不足，不能直接判断为急症，也不能直接归因于疲劳或熬夜。请先确认：',
@@ -97,9 +99,11 @@ export const followupQuestionTool = defineTool({
         system: prompt.system,
         user: prompt.user,
         temperature: 0.2,
+        trace: { traceLogger: ctx.traceLogger, caseId: ctx.caseId, node: 'question.generate' },
       })
     } catch (error) {
       if (!(error instanceof LlmUnavailableError)) throw error
+      ctx.markFallback('question.generate: LLM 不可用，使用 missingInfo 转追问降级')
       // 降级：用 missingInfo 转追问
       const questions = state.missingInfo.slice(0, 3).map((m) => ({
         question: m.question,

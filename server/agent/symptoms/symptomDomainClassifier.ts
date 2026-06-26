@@ -43,6 +43,7 @@ export const symptomDomainClassifyTool = defineTool({
         schemaName: 'symptom_domain_classify',
         system: prompt.system,
         user: prompt.user,
+        trace: { traceLogger: ctx.traceLogger, caseId: ctx.caseId, node: 'symptom.domain_classify' },
       })
       const config = getDomainConfig(llmResult.primaryDomain)
       return {
@@ -51,6 +52,7 @@ export const symptomDomainClassifyTool = defineTool({
       }
     } catch (error) {
       if (!(error instanceof LlmUnavailableError)) throw error
+      ctx.markFallback('symptom_domain_classify: LLM 不可用，使用触发词匹配结果降级')
       return byTrigger
     }
   },

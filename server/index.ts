@@ -12,6 +12,9 @@ import { PrismaPg } from '@prisma/adapter-pg'
 import { createCareCueAgentRuntime, type AgentResponse, type AgentStreamEvent, type CaseState } from './agent/index.ts'
 import { buildStateSnapshot } from './agent/agentResponse.ts'
 import { PrismaCaseStore, persistChatTurn, isPersistableEvent } from './chatStore.ts'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { traceLogDir } from './agent/logs/traceLogger.ts'
 
 const adapter = new PrismaPg({
   connectionString: process.env.DATABASE_URL ?? 'postgresql://carecue:carecue@localhost:5432/carecue?schema=public',
@@ -445,6 +448,25 @@ app.get('/api/agent/cases/:caseId/debug', requireAuth, async (req: AuthedRequest
     return res.status(404).json({ message: '没有找到该病例。' })
   }
   return res.json(debug)
+})
+
+// 导出完整 Trace JSONL（§v3.1）：仅开发环境，或生产环境显式开启 AGENT_DEBUG_PANEL
+app.get('/api/debug/traces/:traceId', requireAuth, (req: AuthedRequest, res) => {
+  if (process.env.NODE_ENV === 'production' && process.env.AGENT_DEBUG_PANEL !== 'true') {
+    return res.status(404).json({ message: 'Not found.' })
+  }
+  const traceId = paramAsString(req.params.traceId)
+  if (!traceId || !/^[a-zA-Z0-9-]+$/.test(traceId)) {
+    return res.status(400).json({ message: '缺少或非法的 traceId。' })
+  }
+  try {
+    const file = join(traceLogDir(), `${traceId}.jsonl`)
+    const lines = readFileSync(file, 'utf8').split('\n').filter((line) => line.trim().length > 0)
+    const events = lines.map((line) => JSON.parse(line))
+    return res.json({ traceId, eventCount: events.length, events })
+  } catch {
+    return res.status(404).json({ message: '没有找到该 Trace（traceId 不存在或日志未落盘）。' })
+  }
 })
 
 app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

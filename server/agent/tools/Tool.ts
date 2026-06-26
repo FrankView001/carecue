@@ -27,6 +27,8 @@ export interface ToolContext {
   /** 依赖注入：LLM 与搜索客户端，便于测试替换 */
   llm: LlmClient
   search?: SearchClient
+  /** 工具内部判断走了降级路径（如 LLM 不可用、解析失败）时调用，供 ToolExecutor 标注 status=fallback */
+  markFallback: (reason: string) => void
 }
 
 export interface CareCueTool<I = unknown, O = unknown> {

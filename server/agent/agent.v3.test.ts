@@ -183,7 +183,7 @@ const tests: TestCase[] = [
       assert.equal(search.calls.length, 0, 'R3 不允许继续搜索')
       assert.equal(response.stateSnapshot.hypotheses.length, 0, 'R3 不继续普通分析（无疑似方向）')
 
-      const trace = traceLogger.getTrace(response.caseId).map((e) => e.eventType)
+      const trace = traceLogger.getTrace(response.caseId).map((e) => e.legacyEventType)
       for (const expected of ['user_input', 'symptom_extracted', 'risk_assessed', 'emergency_guard', 'final_output']) {
         assert.ok(trace.includes(expected as never), `trace 缺少关键节点: ${expected}`)
       }
@@ -367,7 +367,7 @@ const tests: TestCase[] = [
 
       const rejectedEvents = traceLogger
         .getTrace(response.caseId)
-        .filter((e) => e.eventType === 'sources_rejected')
+        .filter((e) => e.legacyEventType === 'sources_rejected')
       assert.ok(rejectedEvents.length > 0, '被过滤来源必须记录在 trace 中')
     },
   },
@@ -510,7 +510,7 @@ const tests: TestCase[] = [
 
       const guardEvents = traceLogger
         .getTrace(response.caseId)
-        .filter((e) => e.eventType === 'medication_boundary_guard')
+        .filter((e) => e.legacyEventType === 'medication_boundary_guard')
       assert.ok(guardEvents.length > 0, 'trace 必须记录用药边界复核')
       // guard 为“修复型”：剔除违规成分项后放行，但 issues 必须被记录
       assert.ok(

@@ -39,6 +39,16 @@ export function humanizeFieldPath(path: string): string {
   return SYMPTOM_FIELD_LABELS[last] ?? last
 }
 
+/** 按路径取值，用于 Trace 中的字段级 diff（state_change） */
+export function getByPath(state: unknown, path: string): unknown {
+  let current: unknown = state
+  for (const segment of path.split('.')) {
+    if (current === null || current === undefined || typeof current !== 'object') return undefined
+    current = (current as Record<string, unknown>)[segment]
+  }
+  return current
+}
+
 /** 按路径判断字段是否已有有效值（空字符串/空数组视为无值） */
 export function fieldHasValue(state: CaseState, path: string): boolean {
   let current: unknown = state
