@@ -1,7 +1,7 @@
 // Workspace：共享工作区。所有工具读写它，所有决策基于它（设计文档 2.3）。
 // 只允许增量更新，不允许整体替换；toSummary() 生成给 LLM 看的紧凑描述。
 
-import type { Hypothesis, RedFlag, RedFlagStatus } from '../schemas/index.ts'
+import type { ExtractedFacts, Hypothesis, RedFlag, RedFlagStatus } from '../schemas/index.ts'
 import type { RedFlagDef } from '../knowledge/loader.ts'
 
 export interface WorkspaceSnapshot {
@@ -17,6 +17,7 @@ export interface WorkspaceSnapshot {
   awaitingRedFlag?: string
   rounds: number
   searchResults: Record<string, unknown>
+  lastExtractedMessage?: string
 }
 
 export class Workspace {
@@ -34,6 +35,10 @@ export class Workspace {
   awaitingRedFlag?: string
   rounds = 0
   searchResults: Record<string, unknown> = {}
+  /** 本轮用户输入（供 requiredAction 判断是否已抽取）。 */
+  currentMessage = ''
+  /** 已抽取过的最近一条文本，避免对同一句重复 extract_facts。 */
+  lastExtractedMessage?: string
 
   constructor(caseId: string) {
     this.caseId = caseId
@@ -42,6 +47,20 @@ export class Workspace {
   // ── 增量更新 ──────────────────────────────────────────────────────────────
   addSymptom(symptom: string): void {
     if (symptom && !this.symptoms.includes(symptom)) this.symptoms.push(symptom)
+  }
+
+  /** 写入 extract_facts 的抽取结果（增量合并，不整体替换）。 */
+  applyFacts(extracted: ExtractedFacts): void {
+    if (extracted.age !== undefined && this.age === undefined) this.age = extracted.age
+    if (extracted.sex !== undefined && this.sex === undefined) this.sex = extracted.sex
+    extracted.symptoms.forEach((s) => this.addSymptom(s))
+    for (const [k, v] of Object.entries(extracted.facts)) {
+      if (this.extractedFacts[k] === undefined) this.extractedFacts[k] = v
+    }
+  }
+
+  addSearchResult(query: string, result: unknown): void {
+    this.searchResults[query] = result
   }
 
   /** 加载红旗：把知识库定义转为运行态 pending 条目（已存在的不覆盖状态）。 */
@@ -71,6 +90,18 @@ export class Workspace {
   addHypothesis(h: Hypothesis): void {
     if (this.hypotheses.some((x) => x.name === h.name)) return
     this.hypotheses.push(h)
+  }
+
+  /** 调整假设权重并记录证据（delta 正=支持，负=反对）。返回是否命中已有假设。 */
+  updateHypothesis(name: string, delta: number, evidence?: string): boolean {
+    const h = this.hypotheses.find((x) => x.name === name)
+    if (!h) return false
+    h.weight = Math.min(1, Math.max(0, h.weight + delta))
+    if (evidence) {
+      if (delta >= 0) h.supportingEvidence.push(evidence)
+      else h.againstEvidence.push(evidence)
+    }
+    return true
   }
 
   recordQuestion(question: string): void {
@@ -126,6 +157,7 @@ export class Workspace {
       awaitingRedFlag: this.awaitingRedFlag,
       rounds: this.rounds,
       searchResults: { ...this.searchResults },
+      lastExtractedMessage: this.lastExtractedMessage,
     }
   }
 
@@ -142,6 +174,7 @@ export class Workspace {
     ws.awaitingRedFlag = snap.awaitingRedFlag
     ws.rounds = snap.rounds
     ws.searchResults = { ...snap.searchResults }
+    ws.lastExtractedMessage = snap.lastExtractedMessage
     return ws
   }
 }

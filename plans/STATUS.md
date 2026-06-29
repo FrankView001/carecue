@@ -1,7 +1,56 @@
 # CareCue Agent v4.0 改造状态记录
 
 > 创建日期: 2026-06-27
-> 最后更新: 2026-06-29 (M2 接入真实 LLM — DeepSeek 决策类 + 路由 + 可观测性)
+> 最后更新: 2026-06-29 (M3 扩展能力 + M4 用户测试 — v4.0 设计文档 M1–M4 全部落地)
+
+---
+
+## 0ter、v4.0 设计文档落地 — M3 扩展能力 + M4 用户测试（2026-06-29）
+
+> 依据：`plans/agent升级计划.md` M3/M4；模块文档 `plans/003-M3扩展能力.md`、`plans/004-M4用户测试与优化.md`。
+
+**M3（扩展能力）已达成：**
+
+| M3 项 | 状态 | 说明 |
+|------|------|------|
+| 知识库扩到 10 组症状 | ✅ | 头晕胸闷/头痛/腹痛/发热/咳嗽/皮疹/腹泻/咽喉痛/腰背痛/眼睛不适，各 3 红旗 |
+| extract_facts 工具 | ✅ | `RuleExtractor`（同义词症状+年龄/性别/时长），取代主循环 naive 种子；可注入 LLM 抽取 |
+| 症状同义词识别 | ✅ | `symptom_synonyms.yaml` + `matchSymptoms`（最长优先），口语「肚子疼」→腹痛 |
+| hypothesis 系列工具 | ✅ | add_hypothesis / update_hypothesis（权重 clamp [0,1] + 证据归档） |
+| search_medical（Firecrawl） | ✅ | `SearchClient` 可注入，懒加载 SDK；无 Key/失败优雅降级不抛错 |
+| Guard 全部 5 条 | ✅ | 1+5 强制（requiredAction）、2+3（guard）、4（guardReport）+ 防空转 |
+| 可观测性落 PG | ✅ | `PrismaTraceSink` → `agent_traces`/`agent_workspaces`；schema 模型 + migration 已写 |
+
+**M4（用户测试与优化）已达成：** 模拟 20 例咨询 harness，核对成功标准——
+急症召回 **10/10（100%）**、单咨询 LLM 调用 **最大 7（≤8）**、轮均耗时 mock 下 <1ms。
+
+**新增/改动文件（相对 M2）：**
+```
+server/src/agent/extractor.ts          # Extractor 接口 + RuleExtractor
+server/src/agent/search.ts             # SearchClient 接口 + Firecrawl 实现（可注入）
+server/src/agent/trace.ts              # + TraceSink / PrismaTraceSink
+server/src/agent/loop.ts               # 强制 extract_facts；createM3Engine；env 工厂接 Firecrawl
+server/src/agent/workspace.ts          # applyFacts / updateHypothesis / addSearchResult
+server/src/tools/{extractFacts,addHypothesis,updateHypothesis,searchMedical}.ts
+server/src/tools/index.ts              # createM3ToolRegistry（8 工具）
+server/src/knowledge/files/*.yaml      # 10 组症状 + symptom_synonyms.yaml
+server/src/{m3,m4}.test.ts             # 13 + 5 用例
+prisma/schema.prisma                   # AgentTrace / AgentWorkspace 模型
+prisma/migrations/20260629000000_add_agent_observability/migration.sql
+```
+
+**验证（全部通过）：**
+```bash
+npm run test:agent4   # M1–M4 串跑：8 + 9 + 13 + 5 = 35 用例全过
+npx tsc -p tsconfig.server.json --noEmit   # server/src/ 0 错误
+```
+
+**上线接线（一次性）：**
+1. `.env` 配 `DEEPSEEK_API_KEY`（+可选 `OPENROUTER_API_KEY`、`FIRECRAWL_API_KEY`）。
+2. `prisma migrate deploy` 建 `agent_traces`/`agent_workspaces`；落库时给 `MemoryTracer` 挂 `PrismaTraceSink(prisma)`。
+3. 把 `createConsultRouter(createConsultEngineFromEnv(tracer))` 挂进应用（与遗留 `server/agent/` 并存，逐步替换）。
+
+**v4.0 设计文档 M1–M4 全部完成。** 遗留 `server/agent/` 仍在位、未删除，迁移切换可在灰度后进行。
 
 ---
 

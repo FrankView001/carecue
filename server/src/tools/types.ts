@@ -6,12 +6,18 @@ import type { FinalReport, ToolName } from '../schemas/index.ts'
 import type { ToolSpec } from '../agent/llm.ts'
 import type { Workspace } from '../agent/workspace.ts'
 import type { Knowledge } from '../knowledge/loader.ts'
+import type { Extractor } from '../agent/extractor.ts'
+import type { SearchClient } from '../agent/search.ts'
 
 export interface ToolContext {
   workspace: Workspace
   knowledge: Knowledge
   /** 本轮用户最新输入（部分工具需要，如把回答写成 evidence）。 */
   lastUserMessage: string
+  /** extract_facts 用的抽取器。 */
+  extractor: Extractor
+  /** search_medical 用的联网检索客户端（未配置时为空，工具会优雅失败）。 */
+  search?: SearchClient
 }
 
 export interface ToolResult {

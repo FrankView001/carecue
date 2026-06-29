@@ -45,3 +45,108 @@
       severity: medium
       ask: 上腹或右上腹剧痛、放射到背部，伴发烧或皮肤、眼白发黄吗？
       positive_signals: [放射到背部, 发热, 黄疸, 眼白发黄]
+
+- symptoms: [发热]
+  red_flags:
+    - name: 脓毒症/重症感染
+      severity: high
+      ask: 有没有意识模糊、嗜睡叫不醒、寒战不止，或皮肤出现按不褪色的出血点？
+      positive_signals: [意识模糊, 嗜睡, 叫不醒, 寒战不止, 出血点, 不褪色皮疹]
+    - name: 中枢神经感染
+      severity: high
+      ask: 高烧伴剧烈头痛、脖子发硬、怕光或喷射性呕吐吗？
+      positive_signals: [剧烈头痛, 颈强直, 脖子发硬, 怕光, 喷射性呕吐]
+    - name: 持续高热/脱水
+      severity: medium
+      ask: 高烧是否超过 3 天不退，或一天都没怎么排尿、口干乏力？
+      positive_signals: [高烧不退, 三天不退, 无尿, 口干, 乏力]
+
+- symptoms: [咳嗽]
+  red_flags:
+    - name: 呼吸窘迫
+      severity: high
+      ask: 有没有明显气短、喘不上气、嘴唇发紫，或稍动一下就喘？
+      positive_signals: [气短, 喘不上气, 呼吸困难, 嘴唇发紫, 紫绀]
+    - name: 咯血/肺栓塞
+      severity: high
+      ask: 有没有咳出血、突发胸痛伴心跳加快，或一侧小腿肿痛？
+      positive_signals: [咯血, 咳血, 突发胸痛, 心跳加快, 小腿肿痛]
+    - name: 肺炎倾向
+      severity: medium
+      ask: 咳嗽伴持续高烧、黄绿色脓痰或胸口闷痛吗？
+      positive_signals: [持续高烧, 脓痰, 黄绿色痰, 胸闷痛]
+
+- symptoms: [皮疹]
+  red_flags:
+    - name: 严重过敏/过敏性休克
+      severity: high
+      ask: 皮疹同时有嘴唇舌头肿、喉咙发紧、呼吸困难或头晕想晕倒吗？
+      positive_signals: [嘴唇肿, 舌头肿, 喉咙发紧, 呼吸困难, 头晕想晕]
+    - name: 重症药疹/感染性皮疹
+      severity: high
+      ask: 皮疹伴高烧、口腔眼睛黏膜破溃、皮肤大片脱皮或按不褪色的出血点吗？
+      positive_signals: [高烧, 黏膜破溃, 大片脱皮, 出血点, 不褪色]
+    - name: 带状疱疹/局部感染
+      severity: medium
+      ask: 皮疹呈单侧带状、灼痛明显，或局部红肿热痛在扩大吗？
+      positive_signals: [单侧带状, 灼痛, 红肿热痛, 扩大]
+
+- symptoms: [腹泻]
+  red_flags:
+    - name: 重度脱水
+      severity: high
+      ask: 有没有几乎不排尿、站起来眼前发黑、心慌乏力或精神萎靡？
+      positive_signals: [无尿, 眼前发黑, 心慌, 精神萎靡, 站立头晕]
+    - name: 血便/侵袭性肠炎
+      severity: high
+      ask: 大便里有血或黏液脓血、伴高烧或剧烈腹痛吗？
+      positive_signals: [血便, 黏液脓血, 高烧, 剧烈腹痛]
+    - name: 持续腹泻
+      severity: medium
+      ask: 腹泻是否超过 3 天不缓解，或一天十几次以上？
+      positive_signals: [超过三天, 十几次, 持续不缓解]
+
+- symptoms: [咽喉痛]
+  red_flags:
+    - name: 气道梗阻
+      severity: high
+      ask: 有没有吞咽困难到流口水、说话含糊、喘鸣或呼吸费力？
+      positive_signals: [吞咽困难, 流口水, 说话含糊, 喘鸣, 呼吸费力]
+    - name: 咽喉深部感染
+      severity: high
+      ask: 是否一侧咽痛剧烈、张口困难、脖子肿胀发硬或高烧？
+      positive_signals: [一侧剧痛, 张口困难, 脖子肿胀, 高烧]
+    - name: 链球菌咽炎倾向
+      severity: medium
+      ask: 有高烧、扁桃体脓点、颈部淋巴结肿痛而没有咳嗽吗？
+      positive_signals: [高烧, 脓点, 淋巴结肿痛, 无咳嗽]
+
+- symptoms: [腰背痛]
+  red_flags:
+    - name: 马尾综合征
+      severity: high
+      ask: 有没有大小便失禁或排不出、会阴部（骑车座区）麻木、双腿无力？
+      positive_signals: [大小便失禁, 排尿困难, 会阴麻木, 双腿无力, 鞍区麻木]
+    - name: 脊柱感染/肿瘤
+      severity: high
+      ask: 腰背痛伴发烧、夜间痛醒、无诱因体重下降，或有肿瘤病史吗？
+      positive_signals: [发热, 夜间痛醒, 体重下降, 肿瘤病史]
+    - name: 肾绞痛/内脏牵涉
+      severity: medium
+      ask: 是一侧腰部绞痛放射到下腹或会阴、伴血尿或恶心呕吐吗？
+      positive_signals: [腰部绞痛, 放射下腹, 血尿, 恶心呕吐]
+
+- symptoms: [眼睛不适]
+  red_flags:
+    - name: 急性闭角型青光眼
+      severity: high
+      ask: 有没有突发眼痛伴看灯有彩虹圈、视力骤降、头痛恶心呕吐？
+      positive_signals: [突发眼痛, 彩虹圈, 视力骤降, 头痛恶心]
+    - name: 视网膜脱离/血管阻塞
+      severity: high
+      ask: 是不是突然眼前黑影飘动、闪光感增多，或一块视野像窗帘遮住、无痛性视力骤降？
+      positive_signals: [黑影飘动, 闪光感, 视野缺损, 窗帘遮挡, 无痛视力下降]
+    - name: 角膜感染/眼外伤
+      severity: medium
+      ask: 有明显畏光流泪、异物感持续、眼红伴脓性分泌物，或近期戴隐形/外伤吗？
+      positive_signals: [畏光流泪, 异物感, 脓性分泌物, 隐形眼镜, 外伤]

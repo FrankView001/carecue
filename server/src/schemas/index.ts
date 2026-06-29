@@ -51,11 +51,43 @@ export const GenerateReportInput = z.object({
   // 从 workspace 读，无需额外字段；保留占位以满足「所有工具入参用 Zod」。
 }).strict()
 
+export const ExtractFactsInput = z.object({
+  text: z.string().min(1),
+})
+
+export const AddHypothesisInput = z.object({
+  name: z.string().min(1),
+  initialEvidence: z.string().optional(),
+})
+
+export const UpdateHypothesisInput = z.object({
+  name: z.string().min(1),
+  /** 权重增量，[-1, 1]；正=支持，负=反对。 */
+  delta: z.number().min(-1).max(1),
+  evidence: z.string().optional(),
+})
+
+export const SearchMedicalInput = z.object({
+  query: z.string().min(1),
+})
+
+// ── 抽取结果（extract_facts 输出） ──────────────────────────────────────────────
+export interface ExtractedFacts {
+  symptoms: string[]
+  age?: number
+  sex?: 'male' | 'female'
+  facts: Record<string, string>
+}
+
 // ── 工具动作（LLM 决策输出） ────────────────────────────────────────────────────
 export type ToolName =
+  | 'extract_facts'
   | 'lookup_red_flags'
   | 'ask_user'
   | 'update_red_flag'
+  | 'add_hypothesis'
+  | 'update_hypothesis'
+  | 'search_medical'
   | 'generate_report'
 
 export interface ToolCall {

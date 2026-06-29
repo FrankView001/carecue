@@ -118,3 +118,30 @@ model ConsultationResult {
 
   @@map("consultation_results")
 }
+
+// ── CareCue 4.0 约束式事件循环可观测性（设计文档 2.8） ──────────────────────────
+// agent_traces：每次工具调用 / LLM 调用 / Guard 拦截一行。
+model AgentTrace {
+  id         String   @id @default(uuid())
+  caseId     String   @map("case_id")
+  kind       String
+  name       String
+  durationMs Int?     @map("duration_ms")
+  data       Json?
+  ts         DateTime @default(now())
+
+  @@index([caseId, ts])
+  @@map("agent_traces")
+}
+
+// agent_workspaces：每个会话一行，snapshot 存每轮 Workspace 快照（JSONB）。
+model AgentWorkspace {
+  id        String   @id
+  snapshot  Json
+  rounds    Int      @default(0)
+  riskLevel String   @default("R0") @map("risk_level")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("agent_workspaces")
+}

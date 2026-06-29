@@ -44,8 +44,10 @@ export interface RedFlagDef {
 }
 
 export interface Knowledge {
-  /** 知识库中出现过的全部症状词（M1 naive 种子用）。 */
+  /** 知识库中出现过的全部规范症状词。 */
   symptomVocabulary: string[]
+  /** 从自然语言里识别规范症状词（含口语同义词），保证召回。 */
+  matchSymptoms(text: string): string[]
   /** 按用户症状检索匹配的红旗定义（任一症状命中即匹配，保证召回）。 */
   lookupRedFlags(symptoms: string[]): RedFlagDef[]
   /** 按症状取护理建议，无匹配回退到「默认」。 */
@@ -62,12 +64,30 @@ export function loadKnowledge(): Knowledge {
   const redFlagEntries = loadYaml<RedFlagEntry[]>('red_flags.yaml')
   const carePlanEntries = loadYaml<CarePlanEntry[]>('care_plans.yaml')
   const referralRules = loadYaml<ReferralRule[]>('referral_rules.yaml')
+  const synonymMap = loadYaml<Record<string, string[]>>('symptom_synonyms.yaml')
 
   const vocab = new Set<string>()
   for (const entry of redFlagEntries) entry.symptoms.forEach((s) => vocab.add(s))
 
+  // 同义词 → 规范词；规范词自身也算自己的同义词。最长优先匹配，避免「头晕」吃掉「头」。
+  const synonyms: Array<{ phrase: string; canonical: string }> = []
+  for (const canonical of vocab) synonyms.push({ phrase: canonical, canonical })
+  for (const [canonical, phrases] of Object.entries(synonymMap)) {
+    if (!vocab.has(canonical)) continue
+    for (const phrase of phrases) synonyms.push({ phrase, canonical })
+  }
+  synonyms.sort((a, b) => b.phrase.length - a.phrase.length)
+
   return {
     symptomVocabulary: [...vocab],
+
+    matchSymptoms(text) {
+      const found = new Set<string>()
+      for (const { phrase, canonical } of synonyms) {
+        if (text.includes(phrase)) found.add(canonical)
+      }
+      return [...found]
+    },
 
     lookupRedFlags(symptoms) {
       const out: RedFlagDef[] = []

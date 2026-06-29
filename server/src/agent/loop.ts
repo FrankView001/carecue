@@ -7,8 +7,16 @@ import { MockLlm, createDeepSeekLlm } from './llm.ts'
 import { Workspace } from './workspace.ts'
 import { guard, guardReport } from './guard.ts'
 import { noopTracer, type Tracer } from './trace.ts'
+import { RuleExtractor, type Extractor } from './extractor.ts'
+import { createFirecrawlSearch, type SearchClient } from './search.ts'
 import { loadKnowledge, type Knowledge } from '../knowledge/loader.ts'
-import { createM1ToolRegistry, ToolRegistry, type ToolContext, type ToolResult } from '../tools/index.ts'
+import {
+  createM1ToolRegistry,
+  createM3ToolRegistry,
+  ToolRegistry,
+  type ToolContext,
+  type ToolResult,
+} from '../tools/index.ts'
 
 const MAX_STEPS = 12
 
@@ -52,21 +60,20 @@ function riskLevel(ws: Workspace): RiskLevel {
 }
 
 /** 硬约束（设计文档 2.6 规则 1、5）：必须做但还没做的事，绕过 LLM 直接强制。 */
-function requiredAction(ws: Workspace): ToolCall | undefined {
+function requiredAction(ws: Workspace, hasExtractTool: boolean): ToolCall | undefined {
+  // 0. 本轮输入尚未抽取 → 强制 extract_facts（取代旧的 naive 种子）。
+  if (hasExtractTool && ws.currentMessage && ws.lastExtractedMessage !== ws.currentMessage) {
+    return { tool: 'extract_facts', input: { text: ws.currentMessage } }
+  }
+  // 1. 症状已知但红旗未加载 → 强制 lookup_red_flags。
   if (ws.symptoms.length > 0 && !ws.redFlagsLoaded) {
     return { tool: 'lookup_red_flags', input: { symptoms: ws.symptoms } }
   }
+  // 5. 高危红旗 positive → 强制急症提示。
   if (ws.positiveHighRiskRedFlag()) {
     return { tool: 'generate_report', input: {} }
   }
   return undefined
-}
-
-/** M1 naive 症状种子（extract_facts 在 M3 替换）：知识库词表命中即记入。 */
-function seedSymptoms(ws: Workspace, message: string, knowledge: Knowledge): void {
-  for (const term of knowledge.symptomVocabulary) {
-    if (message.includes(term)) ws.addSymptom(term)
-  }
 }
 
 /** 工具失败重试 1 次；再失败把错误作为结果返回（设计文档 2.7）。 */
@@ -91,14 +98,20 @@ export interface ConsultEngineDeps {
   knowledge: Knowledge
   registry: ToolRegistry
   tracer?: Tracer
+  /** 缺省用 RuleExtractor（确定性，不触网）。 */
+  extractor?: Extractor
+  /** 缺省无（search_medical 会优雅失败）。 */
+  search?: SearchClient
 }
 
-/** 一次咨询引擎：持有共享依赖与按 caseId 的 Workspace（内存存储；PG 持久化在 M3）。 */
+/** 一次咨询引擎：持有共享依赖与按 caseId 的 Workspace（内存存储；PG 持久化见 trace sink）。 */
 export class ConsultEngine {
   private readonly llm: Llm
   private readonly knowledge: Knowledge
   private readonly registry: ToolRegistry
   private readonly tracer: Tracer
+  private readonly extractor: Extractor
+  private readonly search?: SearchClient
   private readonly store = new Map<string, Workspace>()
 
   constructor(deps: ConsultEngineDeps) {
@@ -106,6 +119,8 @@ export class ConsultEngine {
     this.knowledge = deps.knowledge
     this.registry = deps.registry
     this.tracer = deps.tracer ?? noopTracer
+    this.extractor = deps.extractor ?? new RuleExtractor(deps.knowledge)
+    this.search = deps.search
   }
 
   getWorkspace(caseId: string): Workspace | undefined {
@@ -119,19 +134,28 @@ export class ConsultEngine {
     if (input.sex !== undefined) ws.sex = input.sex
 
     ws.rounds++
-    seedSymptoms(ws, input.userMessage, this.knowledge)
+    ws.currentMessage = input.userMessage
+
+    const hasExtractTool = Boolean(this.registry.get('extract_facts'))
+    if (!hasExtractTool) {
+      // 无 extract_facts 工具（M1 最小集）：直接用抽取器种子，保持兼容。
+      ws.applyFacts(await this.extractor.extract(input.userMessage))
+      ws.lastExtractedMessage = input.userMessage
+    }
 
     const ctx: ToolContext = {
       workspace: ws,
       knowledge: this.knowledge,
       lastUserMessage: input.userMessage,
+      extractor: this.extractor,
+      search: this.search,
     }
 
     let feedback: string | undefined
 
     for (let step = 0; step < MAX_STEPS; step++) {
       // 2/3. 硬约束优先，否则 LLM 决策。
-      const forced = requiredAction(ws)
+      const forced = requiredAction(ws, hasExtractTool)
       let action: ToolCall = forced
         ? forced
         : await this.llm.decide({
@@ -224,10 +248,11 @@ export class ConsultEngine {
 
   private respond(ws: Workspace, tail: ResponseTail): ConsultResponse {
     const snapshot = ws.toSnapshot()
-    this.tracer.log({ caseId: ws.caseId, kind: 'snapshot', name: tail.type, data: snapshot })
+    const level = riskLevel(ws)
+    this.tracer.log({ caseId: ws.caseId, kind: 'snapshot', name: tail.type, data: { ...snapshot, riskLevel: level } })
     const base = {
       caseId: ws.caseId,
-      riskLevel: riskLevel(ws),
+      riskLevel: level,
       rounds: ws.rounds,
       snapshot,
     }
@@ -245,12 +270,27 @@ export function createM1Engine(llm: Llm = new MockLlm()): ConsultEngine {
   })
 }
 
+/** M3 工厂：Mock LLM + 全量工具集（含 extract_facts / hypothesis / search_medical）。 */
+export function createM3Engine(llm: Llm = new MockLlm()): ConsultEngine {
+  return new ConsultEngine({
+    llm,
+    knowledge: loadKnowledge(),
+    registry: createM3ToolRegistry(),
+  })
+}
+
 /**
- * M2 环境工厂：配置了 DeepSeek/OpenRouter Key 时用真实 LLM，否则回退 Mock。
- * 这样本地无 Key 也能跑通，线上配 Key 即接入真实模型（基础设施级回退见 llm.ts）。
+ * 环境工厂：配置了 DeepSeek/OpenRouter Key 时用真实 LLM，否则回退 Mock；
+ * 配置了 Firecrawl Key 时启用联网检索。本地无 Key 也能跑通，线上配 Key 即增强。
  */
 export function createConsultEngineFromEnv(tracer?: Tracer): ConsultEngine {
   const hasKey = Boolean(process.env.DEEPSEEK_API_KEY?.trim() || process.env.OPENROUTER_API_KEY?.trim())
   const llm: Llm = hasKey ? createDeepSeekLlm({ tracer }) : new MockLlm()
-  return new ConsultEngine({ llm, knowledge: loadKnowledge(), registry: createM1ToolRegistry(), tracer })
+  return new ConsultEngine({
+    llm,
+    knowledge: loadKnowledge(),
+    registry: createM3ToolRegistry(),
+    tracer,
+    search: createFirecrawlSearch(),
+  })
 }
