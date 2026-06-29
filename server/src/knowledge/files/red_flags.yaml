@@ -15,3 +15,33 @@
       severity: medium
       ask: 是否感到心跳很快、很乱或有明显的停跳、漏跳感？
       positive_signals: [心悸, 心跳很快, 停跳感, 漏跳, 脉搏不齐]
+
+- symptoms: [头痛]
+  red_flags:
+    - name: 出血性卒中/蛛网膜下腔出血
+      severity: high
+      ask: 是不是突然炸裂般剧痛、几秒内达到一生最痛？伴喷射性呕吐或脖子发硬吗？
+      positive_signals: [炸裂样, 一生最痛, 最剧烈, 喷射性呕吐, 颈强直, 脖子发硬]
+    - name: 颅内压增高/占位
+      severity: high
+      ask: 是否清晨或用力（咳嗽、低头）时加重，伴持续呕吐、看东西重影或肢体无力？
+      positive_signals: [清晨加重, 持续呕吐, 视物重影, 肢体无力, 喷射呕吐]
+    - name: 颞动脉炎/中枢感染
+      severity: medium
+      ask: 有发烧、太阳穴摸上去压痛，或近期视力下降吗？
+      positive_signals: [发热, 太阳穴压痛, 视力下降, 怕光颈硬]
+
+- symptoms: [腹痛]
+  red_flags:
+    - name: 急腹症（阑尾炎/穿孔/梗阻）
+      severity: high
+      ask: 腹痛是否持续加重、按下去更痛或松手更痛（反跳痛）、肚子硬邦邦，或痛点转移到右下腹？
+      positive_signals: [反跳痛, 腹肌紧张, 板状腹, 转移到右下腹, 持续加重]
+    - name: 消化道出血
+      severity: high
+      ask: 有没有解黑便、便血或呕血？同时伴头晕、心慌、出冷汗吗？
+      positive_signals: [黑便, 便血, 呕血, 头晕心慌, 冷汗]
+    - name: 胆道/胰腺急症
+      severity: medium
+      ask: 上腹或右上腹剧痛、放射到背部，伴发烧或皮肤、眼白发黄吗？
+      positive_signals: [放射到背部, 发热, 黄疸, 眼白发黄]

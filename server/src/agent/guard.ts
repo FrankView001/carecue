@@ -24,6 +24,14 @@ const BANNED_PATTERNS: Array<{ re: RegExp; label: string }> = [
  * requiredAction 强制实现，这里覆盖规则 2、3。
  */
 export function guard(action: ToolCall, ws: Workspace): GuardVerdict {
+  // 防空转：红旗已加载时拒绝重复检索（真实 LLM 可能反复调用，避免无进展循环）。
+  if (action.tool === 'lookup_red_flags' && ws.redFlagsLoaded) {
+    return {
+      allow: false,
+      reason: '红旗已加载，无需重复检索；请基于现有红旗 ask_user 追问或 update_red_flag 更新状态。',
+    }
+  }
+
   // 规则 2：有 pending 红旗 → 禁止 generate_report（高危 positive 时放行急症）。
   if (action.tool === 'generate_report') {
     if (ws.positiveHighRiskRedFlag()) return { allow: true }

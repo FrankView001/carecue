@@ -11,6 +11,7 @@
     "test:api": "tsx server/auth.integration.test.ts",
     "test:agent": "tsx server/agent/agent.v3.test.ts && tsx server/agent/llm/llmClient.test.ts",
     "test:m1": "tsx server/src/consult.test.ts",
+    "test:m2": "tsx server/src/m2.test.ts",
     "trace:export": "tsx server/agent/logs/exportTrace.ts",
     "typecheck:api": "tsc -p tsconfig.server.json --noEmit",
     "prisma:generate": "prisma generate",

@@ -3,9 +3,10 @@
 
 import type { FinalReport, ToolCall } from '../schemas/index.ts'
 import type { Llm } from './llm.ts'
-import { MockLlm } from './llm.ts'
+import { MockLlm, createDeepSeekLlm } from './llm.ts'
 import { Workspace } from './workspace.ts'
 import { guard, guardReport } from './guard.ts'
+import { noopTracer, type Tracer } from './trace.ts'
 import { loadKnowledge, type Knowledge } from '../knowledge/loader.ts'
 import { createM1ToolRegistry, ToolRegistry, type ToolContext, type ToolResult } from '../tools/index.ts'
 
@@ -89,19 +90,22 @@ export interface ConsultEngineDeps {
   llm: Llm
   knowledge: Knowledge
   registry: ToolRegistry
+  tracer?: Tracer
 }
 
-/** 一次咨询引擎：持有共享依赖与按 caseId 的 Workspace（M1 内存存储）。 */
+/** 一次咨询引擎：持有共享依赖与按 caseId 的 Workspace（内存存储；PG 持久化在 M3）。 */
 export class ConsultEngine {
   private readonly llm: Llm
   private readonly knowledge: Knowledge
   private readonly registry: ToolRegistry
+  private readonly tracer: Tracer
   private readonly store = new Map<string, Workspace>()
 
   constructor(deps: ConsultEngineDeps) {
     this.llm = deps.llm
     this.knowledge = deps.knowledge
     this.registry = deps.registry
+    this.tracer = deps.tracer ?? noopTracer
   }
 
   getWorkspace(caseId: string): Workspace | undefined {
@@ -138,9 +142,17 @@ export class ConsultEngine {
           })
       feedback = undefined
 
+      this.tracer.log({
+        caseId: ws.caseId,
+        kind: 'decision',
+        name: action.tool,
+        data: { forced: Boolean(forced), input: action.input },
+      })
+
       // 4. Guard 复核。
       const verdict = guard(action, ws)
       if (!verdict.allow) {
+        this.tracer.log({ caseId: ws.caseId, kind: 'guard', name: action.tool, data: { reason: verdict.reason } })
         if (verdict.suggest) {
           action = verdict.suggest
         } else {
@@ -162,7 +174,15 @@ export class ConsultEngine {
       }
 
       // 5. 执行（失败重试 1 次）。
+      const startedAt = Date.now()
       const result = await executeWithRetry(() => tool.run(parsed.data, ctx), action.tool)
+      this.tracer.log({
+        caseId: ws.caseId,
+        kind: 'tool',
+        name: action.tool,
+        durationMs: Date.now() - startedAt,
+        data: { ok: result.ok, summary: result.summary, error: result.error },
+      })
       if (!result.ok) {
         feedback = `工具 ${action.tool} 失败：${result.error}`
         continue
@@ -203,11 +223,13 @@ export class ConsultEngine {
   }
 
   private respond(ws: Workspace, tail: ResponseTail): ConsultResponse {
+    const snapshot = ws.toSnapshot()
+    this.tracer.log({ caseId: ws.caseId, kind: 'snapshot', name: tail.type, data: snapshot })
     const base = {
       caseId: ws.caseId,
       riskLevel: riskLevel(ws),
       rounds: ws.rounds,
-      snapshot: ws.toSnapshot(),
+      snapshot,
     }
     // base 与 tail 都是良类型；联合体的展开赋值需经 unknown 中转（TS 已知限制）。
     return { ...base, ...tail } as unknown as ConsultResponse
@@ -221,4 +243,14 @@ export function createM1Engine(llm: Llm = new MockLlm()): ConsultEngine {
     knowledge: loadKnowledge(),
     registry: createM1ToolRegistry(),
   })
+}
+
+/**
+ * M2 环境工厂：配置了 DeepSeek/OpenRouter Key 时用真实 LLM，否则回退 Mock。
+ * 这样本地无 Key 也能跑通，线上配 Key 即接入真实模型（基础设施级回退见 llm.ts）。
+ */
+export function createConsultEngineFromEnv(tracer?: Tracer): ConsultEngine {
+  const hasKey = Boolean(process.env.DEEPSEEK_API_KEY?.trim() || process.env.OPENROUTER_API_KEY?.trim())
+  const llm: Llm = hasKey ? createDeepSeekLlm({ tracer }) : new MockLlm()
+  return new ConsultEngine({ llm, knowledge: loadKnowledge(), registry: createM1ToolRegistry(), tracer })
 }

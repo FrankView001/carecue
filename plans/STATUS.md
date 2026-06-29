@@ -1,7 +1,45 @@
 # CareCue Agent v4.0 改造状态记录
 
 > 创建日期: 2026-06-27
-> 最后更新: 2026-06-29 (M1 骨架打通 — 按《agent升级计划.md》落地约束式事件循环)
+> 最后更新: 2026-06-29 (M2 接入真实 LLM — DeepSeek 决策类 + 路由 + 可观测性)
+
+---
+
+## 0bis、v4.0 设计文档落地 — M2 接入真实 LLM（2026-06-29）
+
+> 依据：`plans/agent升级计划.md` M2；模块设计文档 `plans/002-M2接入真实LLM.md`。
+
+**目标（M2：接入真实 LLM）已达成：**
+
+| M2 项 | 状态 | 说明 |
+|------|------|------|
+| DeepSeek 接入（真实 tool calling） | ✅ | `DeepSeekLlm` 底层以 `CompleteFn` 注入，可不触网测试解析/回退 |
+| OpenRouter 基础设施级回退 | ✅ | provider 整体失败才切换；不在工具失败时回退（设计 2.7） |
+| Guard V1 | ✅ | pending 禁报告 / 重复问题 / 报告禁语 / 高危 positive 放行 + 新增「红旗已加载禁重复检索」防空转 |
+| Workspace 完整实现 | ✅ | 增量更新 + toSummary + 快照（PG 持久化留 M3） |
+| 端到端 3 个真实症状 | ✅ | 头痛 / 腹痛(急症) / 头晕胸闷，主循环对任意红旗知识库通用 |
+| 可观测性（设计 2.8） | ✅ | `MemoryTracer` 记录 decision/guard/tool/llm/snapshot，对齐 M3 PG 落库 |
+| HTTP 入口 `POST /api/consult` | ✅ | `routes/consult.ts` + `createConsultEngineFromEnv()`（无 Key 回退 Mock） |
+
+**新增/改动文件：**
+```
+server/src/agent/trace.ts          # Tracer 接口 + MemoryTracer（可观测性）
+server/src/agent/llm.ts            # DeepSeekLlm 改为可注入 CompleteFn + trace + 回退；MockLlm 保留
+server/src/agent/guard.ts          # 新增「红旗已加载禁重复检索」规则
+server/src/agent/loop.ts           # 线程化 Tracer；createConsultEngineFromEnv()
+server/src/routes/consult.ts       # POST /api/consult
+server/src/knowledge/files/*.yaml  # 红旗/护理扩到 3 组症状（头晕胸闷 / 头痛 / 腹痛）
+server/src/m2.test.ts              # 9 用例（含 DeepSeek 解析/回退/Guard 闭环 + 路由 HTTP 往返）
+```
+
+**验证：**
+```bash
+npm run test:m1   # 8/8（M1 不回归）
+npm run test:m2   # 9/9（真实 LLM 决策类 / 3 症状 e2e / 路由 / 可观测性）
+npx tsc -p tsconfig.server.json --noEmit   # server/src/ 0 错误
+```
+
+**下一步（M3）：** extract_facts（去掉 naive 症状种子）、search_medical 接 Firecrawl、hypothesis 系列工具、知识库扩到 10 组、Tracer 落 PG（traces/workspaces 表）。上线接真实模型只需在 `.env` 配 `DEEPSEEK_API_KEY`（+ 可选 `OPENROUTER_API_KEY` 回退），并把 `createConsultRouter(createConsultEngineFromEnv())` 挂进应用。
 
 ---
 
